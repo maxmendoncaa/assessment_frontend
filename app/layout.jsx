@@ -1,6 +1,5 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
-import logo from "../public/astonlogo.svg"
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -12,10 +11,14 @@ export const metadata = {
 const RootLayout=({ children })=> {
   return (
     <html>
+      <head>
+        <link rel="icon"  href="favicon.ico"></link>
+      </head>
       <body>
 
       <div className="header-bar">
         <div className="header-image">
+          
           <img src="https://www.aston.ac.uk/themes/custom/aston_university/logo.svg"/>
         </div>
       </div>
