@@ -1,16 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axiosInstance from '@/utils/axios';
 
 const AssessmentRoles = {
-  MODERATOR: 'MODERATOR',
   EXTERNAL_EXAMINER: 'EXTERNAL_EXAMINER',
   INTERNAL_MODERATOR: 'INTERNAL_MODERATOR',
   PROGRAMME_DIRECTOR: 'PROGRAMME_DIRECTOR',
-  MODULE_ASSESSMENT_LEAD: 'MODULE_ASSESSMENT_LEAD',
-  MODULE_LEADER: 'MODULE_LEADER'
+  MODULE_ASSESSMENT_LEAD: 'MODULE_ASSESSMENT_LEAD'
 };
 
 export default function CreateModule() {
@@ -24,7 +22,20 @@ export default function CreateModule() {
   });
   const [assessments, setAssessments] = useState([]);
   const [error, setError] = useState('');
+  const [users, setUsers] = useState([]);
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await axiosInstance.get('api/v1/users/all');
+        setUsers(response.data);
+      } catch (err) {
+        console.error('Failed to fetch users:', err);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const handleChange = (e) => {
     setModuleData({ ...moduleData, [e.target.name]: e.target.value });
@@ -37,39 +48,48 @@ export default function CreateModule() {
       assessmentWeighting: 0,
       plannedIssueDate: '',
       courseworkSubmissionDate: '',
-      participants: []
+      participants: Object.values(AssessmentRoles).map(role => ({ role, users: [] }))
     }]);
   };
   
-  const addParticipant = (assessmentIndex) => {
+  const removeAssessment = (index) => {
+    setAssessments(assessments.filter((_, i) => i !== index));
+  };
+
+  const addParticipant = (assessmentIndex, roleIndex) => {
     const newAssessments = [...assessments];
-    newAssessments[assessmentIndex].participants.push({ userId: '', role: '' });
+    newAssessments[assessmentIndex].participants[roleIndex].users.push({ email: '', userId: null });
     setAssessments(newAssessments);
   };
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   if (!moduleData.name || !moduleData.code || !moduleData.credits || !moduleData.level) {
-  //     setError('All required fields must be filled');
-  //     return;
-  //   }
-  //   try {
-  //     const response = await axiosInstance.post('api/v1/modules/create', {
-  //       moduleName: moduleData.name,
-  //       moduleCode: moduleData.code,
-  //       credits: parseInt(moduleData.credits),
-  //       level: parseInt(moduleData.level),
-  //       moduleOutcomes: moduleData.moduleOutcomes,
-  //       skills: moduleData.skills
-  //     }, { withCredentials: true });
-  //     router.push('/dashboard');
-  //   } catch (err) {
-  //     if (err.response && err.response.status === 400) {
-  //       setError(err.response.data);
-  //     } else {
-  //       setError(`Failed to create module: ${err.message}`);
-  //     }
-  //   }
+
+  const removeParticipant = (assessmentIndex, roleIndex, userIndex) => {
+    const newAssessments = [...assessments];
+    newAssessments[assessmentIndex].participants[roleIndex].users.splice(userIndex, 1);
+    setAssessments(newAssessments);
+  };
+
+  // const handleParticipantChange = (assessmentIndex, roleIndex, userIndex, id) => {
+  //   const newAssessments = [...assessments];
+  //   const user = users.find(u => u.id === id);
+  //   newAssessments[assessmentIndex].participants[roleIndex].users[userIndex] = {
+  //     id,
+  //     userId: user ? user.id : null
+  //   };
+  //   setAssessments(newAssessments);
   // };
+  const handleParticipantChange = (assessmentIndex, roleIndex, userIndex, email) => {
+    const newAssessments = [...assessments];
+    const user = users.find(u => u.email === email); // Match by email
+    newAssessments[assessmentIndex].participants[roleIndex].users[userIndex] = {
+      email,
+      userId: user ? user.userId : null // Assign userId if found, otherwise null
+     
+    };
+    console.log("GGG",user)
+    setAssessments(newAssessments);
+  };
+  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!moduleData.name || !moduleData.code || !moduleData.credits || !moduleData.level) {
@@ -77,29 +97,25 @@ export default function CreateModule() {
       return;
     }
   
-    // Validate assessments
     if (assessments.length === 0) {
       setError('At least one assessment must be added');
       return;
     }
   
-    for (let assessment of assessments) {
-      if (!assessment.assessmentCategory || !assessment.title || !assessment.assessmentWeighting || 
-          !assessment.plannedIssueDate || !assessment.courseworkSubmissionDate) {
-        setError('All assessment fields must be filled');
-        return;
-      }
-      if (assessment.participants.length === 0) {
-        setError('Each assessment must have at least one participant');
-        return;
-      }
-      for (let participant of assessment.participants) {
-        if (!participant.userId || !participant.role) {
-          setError('All participant fields must be filled');
-          return;
-        }
-      }
-    }
+    // for (let assessment of assessments) {
+    //   if (!assessment.assessmentCategory || !assessment.title || !assessment.assessmentWeighting || 
+    //       !assessment.plannedIssueDate || !assessment.courseworkSubmissionDate) {
+    //     setError('All assessment fields must be filled');
+    //     return;
+    //   }
+
+    //   for (let participant of assessment.participants) {
+    //     if (participant.users.length === 0 || participant.users.some(user => !user.userId)) {
+    //       setError(`Each role must have at least one valid user for all assessments`);
+    //       return;
+    //     }
+    //   }
+    // }
   
     try {
       const response = await axiosInstance.post('api/v1/modules/create', {
@@ -115,10 +131,12 @@ export default function CreateModule() {
           assessmentWeighting: parseInt(assessment.assessmentWeighting),
           plannedIssueDate: assessment.plannedIssueDate,
           courseworkSubmissionDate: assessment.courseworkSubmissionDate,
-          participants: assessment.participants.map(participant => ({
-            userId: parseInt(participant.userId),
-            role: participant.role
-          }))
+          participants: assessment.participants.flatMap(participant => 
+            participant.users.map(user => ({
+              userId: user.userId,
+              role: participant.role
+            }))
+          )
         }))
       }, { withCredentials: true });
   
@@ -160,15 +178,15 @@ export default function CreateModule() {
           />
         </div>
         <div>
-            <label htmlFor="credits">Credits:</label>
-            <input
-              type="number"
-              id="credits"
-              name="credits"
-              value={moduleData.credits}
-              onChange={handleChange}
-              required
-            />
+          <label htmlFor="credits">Credits:</label>
+          <input
+            type="number"
+            id="credits"
+            name="credits"
+            value={moduleData.credits}
+            onChange={handleChange}
+            required
+          />
         </div>
         <div>
           <label htmlFor="level">Level:</label>
@@ -201,17 +219,16 @@ export default function CreateModule() {
             required
           />
         </div>
-        <button type="submit">Create Module</button>
-      {/* </form> */}
-      <h3>Assessments</h3>
-        {assessments.map((assessment, index) => (
-          <div key={index}>
+        
+        <h3>Assessments</h3>
+        {assessments.map((assessment, assessmentIndex) => (
+          <div key={assessmentIndex}>
             <input
               type="text"
               value={assessment.assessmentCategory}
               onChange={(e) => {
                 const newAssessments = [...assessments];
-                newAssessments[index].assessmentCategory = e.target.value;
+                newAssessments[assessmentIndex].assessmentCategory = e.target.value;
                 setAssessments(newAssessments);
               }}
               placeholder="Assessment Category"
@@ -222,7 +239,7 @@ export default function CreateModule() {
               value={assessment.title}
               onChange={(e) => {
                 const newAssessments = [...assessments];
-                newAssessments[index].title = e.target.value;
+                newAssessments[assessmentIndex].title = e.target.value;
                 setAssessments(newAssessments);
               }}
               placeholder="Title"
@@ -233,7 +250,7 @@ export default function CreateModule() {
               value={assessment.assessmentWeighting}
               onChange={(e) => {
                 const newAssessments = [...assessments];
-                newAssessments[index].assessmentWeighting = e.target.value;
+                newAssessments[assessmentIndex].assessmentWeighting = e.target.value;
                 setAssessments(newAssessments);
               }}
               placeholder="Assessment Weighting"
@@ -244,7 +261,7 @@ export default function CreateModule() {
               value={assessment.plannedIssueDate}
               onChange={(e) => {
                 const newAssessments = [...assessments];
-                newAssessments[index].plannedIssueDate = e.target.value;
+                newAssessments[assessmentIndex].plannedIssueDate = e.target.value;
                 setAssessments(newAssessments);
               }}
               placeholder="Planned Issue Date"
@@ -255,7 +272,7 @@ export default function CreateModule() {
               value={assessment.courseworkSubmissionDate}
               onChange={(e) => {
                 const newAssessments = [...assessments];
-                newAssessments[index].courseworkSubmissionDate = e.target.value;
+                newAssessments[assessmentIndex].courseworkSubmissionDate = e.target.value;
                 setAssessments(newAssessments);
               }}
               placeholder="Coursework Submission Date"
@@ -263,43 +280,39 @@ export default function CreateModule() {
             />
             
             <h4>Participants</h4>
-            {assessment.participants.map((participant, pIndex) => (
-              <div key={pIndex}>
-                <input
-                  type="text"
-                  value={participant.userId}
-                  onChange={(e) => {
-                    const newAssessments = [...assessments];
-                    newAssessments[index].participants[pIndex].userId = e.target.value;
-                    setAssessments(newAssessments);
-                  }}
-                  placeholder="User ID"
-                  required
-                />
-                <select
-                  value={participant.role}
-                  onChange={(e) => {
-                    const newAssessments = [...assessments];
-                    newAssessments[index].participants[pIndex].role = e.target.value;
-                    setAssessments(newAssessments);
-                  }}
-                  required
-                >
-                  <option value="">Select a role</option>
-                  {Object.values(AssessmentRoles).map(role => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
-                </select>
+            {assessment.participants.map((participant, roleIndex) => (
+              <div key={roleIndex}>
+                <h5>{participant.role}</h5>
+                {participant.users.map((user, userIndex) => (
+                  <div key={userIndex}>
+                    <input
+                      value={user.email}
+                      onChange={(e) => handleParticipantChange(assessmentIndex, roleIndex, userIndex, e.target.value)}
+                      placeholder={`${participant.role} Email`}
+                      list={`users-${assessmentIndex}-${roleIndex}-${userIndex}`}
+                      required
+                    />
+                    <datalist id={`users-${assessmentIndex}-${roleIndex}-${userIndex}`}>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.email} >{u.email}</option>
+                      ))}
+                    </datalist>
+                    <button type="button" onClick={() => removeParticipant(assessmentIndex, roleIndex, userIndex)}>
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => addParticipant(assessmentIndex, roleIndex)}>
+                  Add {participant.role}
+                </button>
               </div>
             ))}
-            <button type="button" onClick={() => addParticipant(index)}>Add Participant</button>
+            <button type="button" onClick={() => removeAssessment(assessmentIndex)}>Remove Assessment</button>
           </div>
         ))}
         <button type="button" onClick={addAssessment}>Add Assessment</button>
-
         <button type="submit">Create Module</button>
       </form>
     </div>
-    
   );
 }
