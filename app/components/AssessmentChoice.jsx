@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import axiosInstance from '@/utils/axios';
 
 export default function AssessmentChoicePage({ moduleId }) {
+  console.log("sasda",moduleId)
   const [assessments, setAssessments] = useState([]);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -12,19 +13,25 @@ export default function AssessmentChoicePage({ moduleId }) {
   useEffect(() => {
     const fetchAssessments = async () => {
       try {
-        const response = await axiosInstance.get(`api/v1/modules/${moduleId}/assessments/user`, { withCredentials: true });
-        setAssessments(response.data);
+        // Make sure moduleId is a valid number before making the API call
+        if (moduleId && !isNaN(moduleId)) {
+          const response = await axiosInstance.get(`api/v1/modules/${moduleId}/assessments/user`, { withCredentials: true });
+          setAssessments(response.data);
+        } else {
+          setError('Invalid module ID');
+        }
       } catch (err) {
         console.error('Error fetching assessments:', err);
         setError(`Failed to fetch assessments: ${err.message}`);
       }
     };
-
+  
     fetchAssessments();
   }, [moduleId]);
 
+  
   const handleAssessmentClick = (assessmentId) => {
-    router.push(`/assessments/${assessmentId}`);
+    router.push(`/assessmentPage/${assessmentId}`);
   };
 
   if (error) return <div className="error-message">Error: {error}</div>;

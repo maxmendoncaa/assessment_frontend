@@ -4,9 +4,7 @@ import AssessmentChoicePage from '@/app/components/AssessmentChoice';
 import { useParams } from 'next/navigation';
 //import AssessmentChoicePage from '@/app/components/AssessmentChoicePage';
 
-export default function AssessmentChoicePageWrapper() {
-  const params = useParams();
-  const id = params.id;
+export default function AssessmentChoicePageWrapper(props) {
 
-  return <AssessmentChoicePage moduleId={id} />;
+    return <AssessmentChoicePage moduleId={props.params.id} />;
 }
