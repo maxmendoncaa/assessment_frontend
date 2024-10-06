@@ -623,12 +623,13 @@ mitigating solutions to...."
       }
     }
   };
-
   return (
     <div className="create-module-container">
       <h1>Create New Module</h1>
       {error && <p className="error">{error}</p>}
       <form onSubmit={handleSubmit}>
+        
+        {/* Module Name */}
         <div>
           <label htmlFor="name">Module Name:</label>
           <input
@@ -640,6 +641,8 @@ mitigating solutions to...."
             required
           />
         </div>
+        
+        {/* Module Code */}
         <div>
           <label htmlFor="code">Module Code:</label>
           <input
@@ -652,6 +655,7 @@ mitigating solutions to...."
           />
         </div>
         
+        {/* Credits */}
         <div>
           <label htmlFor="credits">Credits:</label>
           <select
@@ -671,7 +675,8 @@ mitigating solutions to...."
             ))}
           </select>
         </div>
-
+        
+        {/* Level */}
         <div>
           <label htmlFor="level">Level:</label>
           <select
@@ -691,8 +696,8 @@ mitigating solutions to...."
             ))}
           </select>
         </div>
-
-
+        
+        {/* Module Leader */}
         <div>
           <label htmlFor="moduleLeader">Module Leader(s):</label>
           <input
@@ -703,6 +708,8 @@ mitigating solutions to...."
             readOnly
           />
         </div>
+        
+        {/* Module Outcomes */}
         <div>
           <label htmlFor="moduleOutcomes">Module Outcomes:</label>
           <textarea
@@ -711,17 +718,15 @@ mitigating solutions to...."
             value={moduleData.moduleOutcomes}
             onChange={handleChange}
             required
-    
           />
         </div>
-
-       
-
-        
-        
+  
+        {/* Skills or Knowledge */}
         <div>
-          <label htmlFor="skills">MLOs and/or Knowledge,Skills, & Behaviours(KSBs) covered by this assessment:</label>
-            <textarea
+          <label htmlFor="skills">
+            MLOs and/or Knowledge, Skills, & Behaviours(KSBs) covered by this assessment:
+          </label>
+          <textarea
             id="skills"
             name="skills"
             value={moduleData.skills}
@@ -729,52 +734,86 @@ mitigating solutions to...."
             onChange={handleChange}
             required
           />
-          
         </div>
         
+        {/* Assessments */}
         <h3>Assessments</h3>
         {assessments.map((assessment, assessmentIndex) => (
           <div key={assessmentIndex} className="assessment-container">
+            
+            {/* Assessment Category */}
+            <label htmlFor={`assessmentCategory-${assessmentIndex}`}>Assessment Category</label>
             <input
               type="text"
+              id={`assessmentCategory-${assessmentIndex}`}
               value={assessment.assessmentCategory}
-              onChange={(e) => handleAssessmentChange(assessmentIndex, 'assessmentCategory', e.target.value)}
+              onChange={(e) =>
+                handleAssessmentChange(assessmentIndex, 'assessmentCategory', e.target.value)
+              }
               placeholder="Assessment Category"
               required
             />
+            <br />
+  
+            {/* Title */}
+            <label htmlFor={`title-${assessmentIndex}`}>Title</label>
             <input
               type="text"
+              id={`title-${assessmentIndex}`}
               value={assessment.title}
-              onChange={(e) => handleAssessmentChange(assessmentIndex, 'title', e.target.value)}
+              onChange={(e) =>
+                handleAssessmentChange(assessmentIndex, 'title', e.target.value)
+              }
               placeholder="Title"
               required
             />
+            <br />
+  
+            {/* Assessment Weighting */}
+            <label htmlFor={`assessmentWeighting-${assessmentIndex}`}>Assessment Weighting</label>
             <input
               type="number"
+              id={`assessmentWeighting-${assessmentIndex}`}
               value={assessment.assessmentWeighting}
-              onChange={(e) => handleAssessmentChange(assessmentIndex, 'assessmentWeighting', e.target.value)}
+              onChange={(e) =>
+                handleAssessmentChange(assessmentIndex, 'assessmentWeighting', e.target.value)
+              }
               placeholder="Assessment Weighting"
               min="1"
               max="100"
               required
             />
-
-
+            <br />
+  
+            {/* Planned Issue Date */}
+            <label htmlFor={`plannedIssueDate-${assessmentIndex}`}>Planned Issue Date</label>
             <input
               type="date"
+              id={`plannedIssueDate-${assessmentIndex}`}
               value={assessment.plannedIssueDate}
-              onChange={(e) => handleAssessmentChange(assessmentIndex, 'plannedIssueDate', e.target.value)}
+              onChange={(e) =>
+                handleAssessmentChange(assessmentIndex, 'plannedIssueDate', e.target.value)
+              }
               placeholder="Planned Issue Date"
               required
             />
+            <br />
+  
+            {/* Coursework Submission Date */}
+            <label htmlFor={`courseworkSubmissionDate-${assessmentIndex}`}>Coursework Submission Date</label>
             <input
               type="date"
+              id={`courseworkSubmissionDate-${assessmentIndex}`}
               value={assessment.courseworkSubmissionDate}
-              onChange={(e) => handleAssessmentChange(assessmentIndex, 'courseworkSubmissionDate', e.target.value)}
+              onChange={(e) =>
+                handleAssessmentChange(assessmentIndex, 'courseworkSubmissionDate', e.target.value)
+              }
               placeholder="Coursework Submission Date"
               required
             />
-            
+            <br />
+  
+            {/* Participants */}
             <h4>Participants</h4>
             {assessment.participants.map((participant, participantIndex) => (
               <div key={participantIndex} className="participant-container">
@@ -813,7 +852,9 @@ mitigating solutions to...."
             <button type="button" onClick={() => addParticipant(assessmentIndex)}>
               Add Participant
             </button>
-            <button type="button" onClick={() => removeAssessment(assessmentIndex)}>Remove Assessment</button>
+            <button type="button" onClick={() => removeAssessment(assessmentIndex)}>
+              Remove Assessment
+            </button>
           </div>
         ))}
         <button type="button" onClick={addAssessment}>Add Assessment</button>
@@ -821,4 +862,6 @@ mitigating solutions to...."
       </form>
     </div>
   );
+  
+
 }
