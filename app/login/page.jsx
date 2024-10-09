@@ -23,7 +23,8 @@ const LoginPage = () => {
         }).then((data)=>{
           console.log(data)
           Cookies.set('token',data.data.access_token)
-          Cookies.set('email',email)
+          Cookies.set('email',data.data.user.email)
+          
         }).then(()=>{
           // redirect("/dashboard")
           window.location.href="/dashboard"

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import axiosInstance from '@/utils/axios';
 import ModuleDetails from '../moduleDetails/page';
-
+import Cookies from 'js-cookie'
 const ROLES = {
   MODULE_ASSESSMENT_LEAD: 'MODULE_ASSESSMENT_LEAD',
   INTERNAL_MODERATOR: 'INTERNAL_MODERATOR',
@@ -116,9 +116,12 @@ export default function ModerationForm({ assessmentId }) {
     e.preventDefault();
   
     try {
+      const currentDateTime = new Date().toISOString(); // Get current date and time in ISO format
       const response = await axiosInstance.put(`/api/v1/assessments/${assessmentId}`, {
         ...assessment,
-        skills: assessment.skills
+        skills: assessment.skills,
+        moduleAssessmentLeadSignatureDate: currentDateTime,
+        moduleAssessmentLeadSignature: "Submitted by "+Cookies.get('name')
       });
       console.log("Update response:", response.data);
       setAssessment(response.data);
@@ -203,20 +206,9 @@ export default function ModerationForm({ assessmentId }) {
           
           {canEdit && (
             <>
-              <input
-                type="text"
-                name="moduleAssessmentLeadSignature"
-                value={assessment.moduleAssessmentLeadSignature || ''}
-                onChange={handleInputChange}
-                placeholder="Module Assessment Lead Signature"
-              />
-              <input
-                type="date"
-                name="moduleAssessmentLeadSignatureDate"
-                value={assessment.moduleAssessmentLeadSignatureDate || ''}
-                onChange={handleInputChange}
-              />
-              <button type="submit">Submit Assessment Details</button>
+              <p>Module Assessment Lead Signature: {assessment.moduleAssessmentLeadSignature || 'Not signed'}</p>
+      <p>Signature Date: {assessment.moduleAssessmentLeadSignatureDate ? new Date(assessment.moduleAssessmentLeadSignatureDate).toLocaleString() : 'Not dated'}</p>
+      <button type="submit">Submit Assessment Details</button>
             </>
           )}
         </form>

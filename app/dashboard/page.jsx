@@ -22,8 +22,12 @@ export default function Dashboard() {
         });
         const modulesResponse = await axiosInstance.get('api/v1/modules/my-modules', { withCredentials: true });
         const roleResponse = await axiosInstance.get('api/v1/users/role', { withCredentials: true });
-    
+        
+        
         setUserData(userResponse.data);
+        const f=userResponse.data.firstName+' '
+        const l=userResponse.data.lastName
+        Cookies.set('name',f+l)
         setModules(modulesResponse.data);
         setUserRole(roleResponse.data);
       } catch (err) {

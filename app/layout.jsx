@@ -1,6 +1,7 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import 'bootstrap/dist/css/bootstrap.min.css';
+import Cookies from 'js-cookie';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,6 +22,7 @@ const RootLayout=({ children })=> {
         <div className="header-image">
           
           <img src="https://www.aston.ac.uk/themes/custom/aston_university/logo.svg"/>
+          <h6>{Cookies.get('name')}</h6>
         </div>
       </div>
       <main>{children}</main>

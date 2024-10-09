@@ -1,8 +1,8 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import axiosInstance from "@/utils/axios";
-import { Form } from "react-bootstrap";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Button, Form } from "react-bootstrap";
 
 const AssessmentRoles = {
   EXTERNAL_EXAMINER: "EXTERNAL_EXAMINER",
@@ -286,14 +286,18 @@ mitigating solutions to...."
     }
   };
   return (
-    <div style={{ textAlign: "center" }} className="create-module-container">
+    <div
+      style={{ textAlign: "center", margin: "0 5%" }}
+      className="create-module-container"
+    >
       <h1>Create New Module</h1>
       {error && <p className="error">{error}</p>}
       <div
         style={{
           display: "flex",
           justifyContent: "center",
-          width: "100%",
+          flexDirection: "column",
+          width: "70%",
           textAlign: "left",
         }}
       >
@@ -384,6 +388,7 @@ mitigating solutions to...."
             <Form.Control
               id="moduleOutcomes"
               as="textarea"
+              rows={7}
               name="moduleOutcomes"
               value={moduleData.moduleOutcomes}
               onChange={handleChange}
@@ -413,72 +418,75 @@ mitigating solutions to...."
             <div key={assessmentIndex} className="assessment-container">
               {/* Assessment Category */}
               <Form.Group>
-              <Form.Label htmlFor={`assessmentCategory-${assessmentIndex}`}>
-                Assessment Category
-              </Form.Label>
-              <Form.Control
-                type="text"
-                id={`assessmentCategory-${assessmentIndex}`}
-                value={assessment.assessmentCategory}
-                onChange={(e) =>
-                  handleAssessmentChange(
-                    assessmentIndex,
-                    "assessmentCategory",
-                    e.target.value
-                  )
-                }
-                placeholder="Assessment Category"
-                required
-              />
+                <Form.Label htmlFor={`assessmentCategory-${assessmentIndex}`}>
+                  Assessment Category
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  id={`assessmentCategory-${assessmentIndex}`}
+                  value={assessment.assessmentCategory}
+                  onChange={(e) =>
+                    handleAssessmentChange(
+                      assessmentIndex,
+                      "assessmentCategory",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Assessment Category"
+                  required
+                />
               </Form.Group>
               <br />
 
               {/* Title */}
-              <Form.Label htmlFor={`title-${assessmentIndex}`}>
-                Title
-              </Form.Label>
-              <Form.Control
-                type="text"
-                id={`title-${assessmentIndex}`}
-                value={assessment.title}
-                onChange={(e) =>
-                  handleAssessmentChange(
-                    assessmentIndex,
-                    "title",
-                    e.target.value
-                  )
-                }
-                placeholder="Title"
-                required
-              />
+              <Form.Group>
+                <Form.Label htmlFor={`title-${assessmentIndex}`}>
+                  Title
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  id={`title-${assessmentIndex}`}
+                  value={assessment.title}
+                  onChange={(e) =>
+                    handleAssessmentChange(
+                      assessmentIndex,
+                      "title",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Title"
+                  required
+                />
+              </Form.Group>
               <br />
 
               {/* Assessment Weighting */}
-              <Form.Label htmlFor={`assessmentWeighting-${assessmentIndex}`}>
-                Assessment Weighting
-              </Form.Label>
-              <Form.Control
-                type="number"
-                id={`assessmentWeighting-${assessmentIndex}`}
-                value={assessment.assessmentWeighting}
-                onChange={(e) =>
-                  handleAssessmentChange(
-                    assessmentIndex,
-                    "assessmentWeighting",
-                    e.target.value
-                  )
-                }
-                placeholder="Assessment Weighting"
-                min="1"
-                max="100"
-                required
-              />
+              <Form.Group>
+                <Form.Label htmlFor={`assessmentWeighting-${assessmentIndex}`}>
+                  Assessment Weighting
+                </Form.Label>
+                <Form.Control
+                  type="number"
+                  id={`assessmentWeighting-${assessmentIndex}`}
+                  value={assessment.assessmentWeighting}
+                  onChange={(e) =>
+                    handleAssessmentChange(
+                      assessmentIndex,
+                      "assessmentWeighting",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Assessment Weighting"
+                  min="1"
+                  max="100"
+                  required
+                />
+              </Form.Group>
               <br />
 
               <Form.Group>
                 <Form.Label htmlFor={`skills-${assessmentIndex}`}>
-                  MLOs 
-                  and/or Knowledge, Skills, & Behaviours(KSBs) covered by
+                  MLOs and/or Knowledge, Skills, & Behaviours(KSBs) covered by
                   this assessment:
                 </Form.Label>
                 <Form.Control
@@ -499,45 +507,49 @@ mitigating solutions to...."
               </Form.Group>
 
               {/* Planned Issue Date */}
-              <Form.Label htmlFor={`plannedIssueDate-${assessmentIndex}`}>
-                Planned Issue Date
-              </Form.Label>
-              <Form.Control
-                type="date"
-                id={`plannedIssueDate-${assessmentIndex}`}
-                value={assessment.plannedIssueDate}
-                onChange={(e) =>
-                  handleAssessmentChange(
-                    assessmentIndex,
-                    "plannedIssueDate",
-                    e.target.value
-                  )
-                }
-                placeholder="Planned Issue Date"
-                required
-              />
+              <Form.Group>
+                <Form.Label htmlFor={`plannedIssueDate-${assessmentIndex}`}>
+                  Planned Issue Date
+                </Form.Label>
+                <Form.Control
+                  type="date"
+                  id={`plannedIssueDate-${assessmentIndex}`}
+                  value={assessment.plannedIssueDate}
+                  onChange={(e) =>
+                    handleAssessmentChange(
+                      assessmentIndex,
+                      "plannedIssueDate",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Planned Issue Date"
+                  required
+                />
+              </Form.Group>
               <br />
 
               {/* Coursework Submission Date */}
-              <Form.Label
-                htmlFor={`courseworkSubmissionDate-${assessmentIndex}`}
-              >
-                Coursework Submission Date
-              </Form.Label>
-              <Form.Control
-                type="date"
-                id={`courseworkSubmissionDate-${assessmentIndex}`}
-                value={assessment.courseworkSubmissionDate}
-                onChange={(e) =>
-                  handleAssessmentChange(
-                    assessmentIndex,
-                    "courseworkSubmissionDate",
-                    e.target.value
-                  )
-                }
-                placeholder="Coursework Submission Date"
-                required
-              />
+              <Form.Group>
+                <Form.Label
+                  htmlFor={`courseworkSubmissionDate-${assessmentIndex}`}
+                >
+                  Coursework Submission Date
+                </Form.Label>
+                <Form.Control
+                  type="date"
+                  id={`courseworkSubmissionDate-${assessmentIndex}`}
+                  value={assessment.courseworkSubmissionDate}
+                  onChange={(e) =>
+                    handleAssessmentChange(
+                      assessmentIndex,
+                      "courseworkSubmissionDate",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Coursework Submission Date"
+                  required
+                />
+              </Form.Group>
               <br />
 
               {/* Participants */}
@@ -547,7 +559,7 @@ mitigating solutions to...."
                   key={participantIndex}
                   className="participant-container"
                 >
-                  <Form.Control
+                  <Form.Select
                     value={participant.email}
                     onChange={(e) =>
                       handleParticipantChange(
@@ -569,9 +581,8 @@ mitigating solutions to...."
                   </datalist>
                   <Form.Group className="roles-container">
                     {Object.entries(AssessmentRoles).map(([key, value]) => (
-                      <Form.Label key={key} className="role-checkbox">
-                        <Form.Check
-                          type="checkbox"
+                      <Form.Check type="checkbox" className="role-checkbox">
+                        <Form.Check.Input
                           checked={participant.roles.includes(value)}
                           onChange={() =>
                             handleRoleChange(
@@ -581,38 +592,45 @@ mitigating solutions to...."
                             )
                           }
                         />
-                        {key}
-                      </Form.Label>
+                        <Form.Check.Label>{key}</Form.Check.Label>
+                      </Form.Check>
                     ))}
                   </Form.Group>
-                  <button
+                  <Button
+                    variant="outline-danger"
                     type="button"
                     onClick={() =>
                       removeParticipant(assessmentIndex, participantIndex)
                     }
                   >
                     Remove Participant
-                  </button>
+                  </Button>
                 </Form.Group>
               ))}
-              <button
+              <Button
+                variant="primary"
                 type="button"
                 onClick={() => addParticipant(assessmentIndex)}
               >
                 Add Participant
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline-danger"
                 type="button"
                 onClick={() => removeAssessment(assessmentIndex)}
               >
                 Remove Assessment
-              </button>
+              </Button>
             </div>
           ))}
-          <button type="button" onClick={addAssessment}>
+          <div style={{display:'flex', flexDirection:'column'}}>
+          <Button style={{width:"200px", marginBottom:"20px"}} variant="primary" type="button" onClick={addAssessment}>
             Add Assessment
-          </button>
-          <button type="submit">Create Module</button>
+          </Button>
+          </div>
+          <div style={{display:"flex", justifyContent:'center'}}>
+          <Button style={{width:"200px"}} variant="primary" type="submit">Create Module</Button>
+          </div>
         </Form>
       </div>
     </div>
