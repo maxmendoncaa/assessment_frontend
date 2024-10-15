@@ -3,6 +3,7 @@ import axiosInstance from "@/utils/axios";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button, Form } from "react-bootstrap";
+import Select from "react-select";
 
 const AssessmentRoles = {
   EXTERNAL_EXAMINER: "EXTERNAL_EXAMINER",
@@ -29,6 +30,19 @@ mitigating solutions to...."
   const [assessments, setAssessments] = useState([]);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
+  const [singleSelections, setSingleSelections] = useState([]);
+  let searchTerm = ""; // No useState, just a plain variable
+
+  // Filtering users based on the input value (without useState)
+  const filterUsers = (event) => {
+    const value = event.target.value.toLowerCase();
+    searchTerm = value; // Update the searchTerm variable
+    // Refilter the users based on the search term (re-render happens)
+    return users.filter((user) =>
+      user.email.toLowerCase().includes(searchTerm)
+    );
+  };
+
   const router = useRouter();
 
   useEffect(() => {
@@ -42,6 +56,11 @@ mitigating solutions to...."
     };
     fetchUsers();
   }, []);
+
+  const userOptions = users.map((user) => ({
+    value: user.email,
+    label: user.email,
+  }));
 
   const handleChange = (e) => {
     setModuleData({ ...moduleData, [e.target.name]: e.target.value });
@@ -285,12 +304,21 @@ mitigating solutions to...."
       }
     }
   };
+
+  const handleSelectChange = (selectedOption) => {
+    handleParticipantChange(
+      assessmentIndex,
+      participantIndex,
+      selectedOption.value
+    );
+  };
   return (
+    <>
+    <h1 style={{marginBottom:'40px'}}>Create New Module</h1>
     <div
       style={{ textAlign: "center", margin: "0 5%" }}
       className="create-module-container"
     >
-      <h1>Create New Module</h1>
       {error && <p className="error">{error}</p>}
       <div
         style={{
@@ -469,12 +497,13 @@ mitigating solutions to...."
                   type="number"
                   id={`assessmentWeighting-${assessmentIndex}`}
                   value={assessment.assessmentWeighting}
-                  onChange={(e) =>
+                  onChange={(e) =>{
                     handleAssessmentChange(
                       assessmentIndex,
                       "assessmentWeighting",
                       e.target.value
                     )
+                  }
                   }
                   placeholder="Assessment Weighting"
                   min="1"
@@ -559,26 +588,22 @@ mitigating solutions to...."
                   key={participantIndex}
                   className="participant-container"
                 >
-                  <Form.Select
-                    value={participant.email}
-                    onChange={(e) =>
+                  <Select
+                    value={{
+                      value: participant.email,
+                      label: participant.email,
+                    }}
+                    onChange={(e) => {
                       handleParticipantChange(
                         assessmentIndex,
                         participantIndex,
-                        e.target.value
-                      )
-                    }
-                    placeholder="Participant Email"
-                    list={`users-${assessmentIndex}-${participantIndex}`}
-                    required
+                        e.value
+                      );
+                    }}
+                    options={userOptions}
+                    placeholder="Search and select an email..."
+                    isSearchable // This enables the search functionality
                   />
-                  <datalist id={`users-${assessmentIndex}-${participantIndex}`}>
-                    {users.map((u) => (
-                      <option key={u.userId} value={u.email}>
-                        {u.email}
-                      </option>
-                    ))}
-                  </datalist>
                   <Form.Group className="roles-container">
                     {Object.entries(AssessmentRoles).map(([key, value]) => (
                       <Form.Check type="checkbox" className="role-checkbox">
@@ -623,16 +648,24 @@ mitigating solutions to...."
               </Button>
             </div>
           ))}
-          <div style={{display:'flex', flexDirection:'column'}}>
-          <Button style={{width:"200px", marginBottom:"20px"}} variant="primary" type="button" onClick={addAssessment}>
-            Add Assessment
-          </Button>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <Button
+              style={{ width: "200px", marginBottom: "20px" }}
+              variant="primary"
+              type="button"
+              onClick={addAssessment}
+            >
+              Add Assessment
+            </Button>
           </div>
-          <div style={{display:"flex", justifyContent:'center'}}>
-          <Button style={{width:"200px"}} variant="primary" type="submit">Create Module</Button>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <Button style={{ width: "200px" }} variant="primary" type="submit">
+              Create Module
+            </Button>
           </div>
         </Form>
       </div>
     </div>
+    </>
   );
 }

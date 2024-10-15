@@ -66,9 +66,9 @@ export default function Dashboard() {
 
       <div className="action-buttons">
         <button onClick={handleCreateModule} className="create-module-button">Create New Module</button>
-        {canManageModules && (
+        {/* {canManageModules && (
           <button onClick={handleManageModules} className="manage-modules-button">Manage Modules</button>
-        )}
+        )} */}
       </div>
       
       {modules.length === 0 ? (
