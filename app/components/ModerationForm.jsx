@@ -24,12 +24,12 @@ const SECTIONS = {
 
 const TRIGGERS = {
   ASSESSMENT_DETAILS: 'assessmentDetailsTrigger',
-  INTERNAL_MODERATOR: 'internalModeratorDetailsTrigger',
-  EXTERNAL_EXAMINER: 'externalExaminerDetailsTrigger',
-  PROGRAMME_DIRECTOR: 'programmeDirectorDetailsTrigger',
+  INTERNAL_MODERATION: 'internalModeratorDetailsTrigger',
+  EXTERNAL_EXAMINER_REVIEW: 'externalExaminerDetailsTrigger',
+  PROGRAMME_DIRECTOR_CONFIRMATION: 'programmeDirectorDetailsTrigger',
   MODERATION_OF_MARKS: 'internalModeratorModerationOfMarksTrigger',
-  MODERATOR_COMMENTS: 'stage2ModeratorCommentsTrigger',
-  ASSESSMENT_LEAD_STAGE_2: 'stage2ModuleAssessmentLeadCommentsTrigger'
+  ASSESSMENT_LEAD_STAGE_2: 'stage2ModuleAssessmentLeadCommentsTrigger',
+  FINAL_CONFIRMATION: 'finalConfirmationTrigger'
 };
 
 export default function ModerationForm({ assessmentId }) {
@@ -76,21 +76,38 @@ export default function ModerationForm({ assessmentId }) {
     externalExaminerDetailsTrigger: 'Not Completed',
     programmeDirectorDetailsTrigger: 'Not Completed',
     internalModeratorModerationOfMarksTrigger: 'Not Completed',
-    stage2ModeratorCommentsTrigger: 'Not Completed',
-    stage2ModuleAssessmentLeadCommentsTrigger: 'Not Completed'
+    stage2ModuleAssessmentLeadCommentsTrigger: 'Not Completed',
+    finalConfirmationTrigger: 'Not Completed'
   });
 
-  const [currentSection, setCurrentSection] = useState(SECTIONS.ASSESSMENT_DETAILS);
+  const [completedSections, setCompletedSections] = useState({
+    ASSESSMENT_DETAILS: false,
+    INTERNAL_MODERATION: false,
+    RESPONSE_TO_INTERNAL_MODERATOR: false,
+    EXTERNAL_EXAMINER_REVIEW: false,
+    RESPONSE_TO_EXTERNAL_EXAMINER: false,
+    PROGRAMME_DIRECTOR_CONFIRMATION: false,
+    MODERATION_OF_MARKS: false,
+    ASSESSMENT_LEAD_STAGE_2: false,
+    FINAL_CONFIRMATION: false
+  });
+
+  const [isEditMode, setIsEditMode] = useState({
+    ASSESSMENT_DETAILS: true,
+    INTERNAL_MODERATION: false,
+    RESPONSE_TO_INTERNAL_MODERATOR: false,
+    EXTERNAL_EXAMINER_REVIEW: false,
+    RESPONSE_TO_EXTERNAL_EXAMINER: false,
+    PROGRAMME_DIRECTOR_CONFIRMATION: false,
+    MODERATION_OF_MARKS: false,
+    ASSESSMENT_LEAD_STAGE_2: false,
+    FINAL_CONFIRMATION: false
+  });
+
+  const [tempFormData, setTempFormData] = useState({});
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [participants, setParticipants] = useState([]);
-  const [editMode, setEditMode] = useState({});
-
-  const setEditModeForSection = useCallback((section, isEditing) => {
-    setEditMode(prevEditMode => ({
-      ...prevEditMode,
-      [section]: isEditing
-    }));
-  }, []);
 
   useEffect(() => {
     const fetchAssessment = async () => {
@@ -100,14 +117,16 @@ export default function ModerationForm({ assessmentId }) {
           axiosInstance.get(`/api/v1/assessments/${assessmentId}`),
           axiosInstance.get(`/api/v1/assessments/${assessmentId}/participants`)
         ]);
+        
         setAssessment({
           ...assessmentResponse.data,
           userRoles: assessmentResponse.data.userRoles || []
         });
+        
         setParticipants(participantsResponse.data);
-        determineCurrentSection(assessmentResponse.data);
       } catch (err) {
         console.error("Error fetching assessment:", err);
+        setError(`Failed to fetch assessment data: ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -118,175 +137,215 @@ export default function ModerationForm({ assessmentId }) {
     }
   }, [assessmentId]);
 
-  // Prevent page refresh and handle form submission
-  const handleSubmit = async (e, section) => {
-    e.preventDefault(); // Prevents full page refresh
-    const updatedAssessment = { ...assessment };
+  const handleInputChange = (section, field, value) => {
+    setAssessment(prevAssessment => ({
+      ...prevAssessment,
+      [field]: value
+    }));
+  };
 
-    try {
-      // Reset next triggers after the section
-      resetSubsequentTriggers(TRIGGERS[section]);
-
-      const response = await axiosInstance.put(`/api/v1/assessments/${assessmentId}`, updatedAssessment);
-      setAssessment(response.data);
-      setEditModeForSection(section, false);
-      determineCurrentSection(response.data); // Recalculate current section
-    } catch (err) {
-      console.error("Error submitting assessment:", err);
+  const updateTrigger = (section, status) => {
+    const triggerName = TRIGGERS[section];
+    if (triggerName) {
+      setAssessment(prevAssessment => ({
+        ...prevAssessment,
+        [triggerName]: status
+      }));
     }
   };
 
-  // Determine current section based on incomplete triggers
-  const determineCurrentSection = useCallback((assessmentData) => {
-    const triggers = [
-      { trigger: TRIGGERS.ASSESSMENT_DETAILS, section: SECTIONS.ASSESSMENT_DETAILS },
-      { trigger: TRIGGERS.INTERNAL_MODERATOR, section: SECTIONS.INTERNAL_MODERATION },
-      { trigger: TRIGGERS.EXTERNAL_EXAMINER, section: SECTIONS.EXTERNAL_EXAMINER_REVIEW },
-      { trigger: TRIGGERS.PROGRAMME_DIRECTOR, section: SECTIONS.PROGRAMME_DIRECTOR_CONFIRMATION },
-      { trigger: TRIGGERS.MODERATION_OF_MARKS, section: SECTIONS.MODERATION_OF_MARKS },
-      { trigger: TRIGGERS.MODERATOR_COMMENTS, section: SECTIONS.ASSESSMENT_LEAD_STAGE_2 },
-      { trigger: TRIGGERS.ASSESSMENT_LEAD_STAGE_2, section: SECTIONS.FINAL_CONFIRMATION }
-    ];
-
-    for (const { trigger, section } of triggers) {
-      if (assessmentData[trigger] !== 'Completed') {
-        setCurrentSection(section);
-        return;
-      }
-    }
-  }, []);
-
-  // Reset all triggers after the current section
-  const resetSubsequentTriggers = (triggerName) => {
-    const updatedAssessment = { ...assessment };
+  const resetSectionsAfter = (editedSection) => {
+    const sectionsOrder = Object.values(SECTIONS);
     const triggerOrder = Object.values(TRIGGERS);
-    const startResetIndex = triggerOrder.indexOf(triggerName) + 1;
-
-    for (let i = startResetIndex; i < triggerOrder.length; i++) {
-      updatedAssessment[triggerOrder[i]] = 'Not Completed';
-    }
-    setAssessment(updatedAssessment);
+    
+    let shouldReset = false;
+    sectionsOrder.forEach((section, index) => {
+      if (shouldReset) {
+        setCompletedSections(prevState => ({
+          ...prevState,
+          [section]: false
+        }));
+        updateTrigger(section, 'Not Completed');
+      }
+      if (section === editedSection) {
+        shouldReset = true;
+      }
+    });
   };
 
-  const handleTriggerClick = async (triggerName) => {
+  const handleSubmit = async (section) => {
     try {
+      // Update the current section's trigger to 'Completed'
+      updateTrigger(section, 'Completed');
+      
       const updatedAssessment = {
         ...assessment,
-        [triggerName]: 'Completed'
+        [TRIGGERS[section]]: 'Completed'
       };
-      resetSubsequentTriggers(triggerName); // Reset triggers after the current one
+
+      // Find the next section and update its trigger
+      const sections = Object.values(SECTIONS);
+      const currentIndex = sections.indexOf(section);
+      if (currentIndex < sections.length - 1) {
+        const nextSection = sections[currentIndex + 1];
+        updatedAssessment[TRIGGERS[nextSection]] = 'Not Completed';
+      }
 
       const response = await axiosInstance.put(`/api/v1/assessments/${assessmentId}`, updatedAssessment);
       setAssessment(response.data);
-      determineCurrentSection(response.data); // Determine the new current section
-    } catch (err) {
-      console.error("Error updating trigger:", err);
-    }
-  };
-
-  // Check if the user is allowed to edit and determine button rendering
-  const renderTriggerButton = (triggerName, requiredRole, sectionName) => {
-    const canAccess = isUserAllowedToEdit(requiredRole);
-    const isCompleted = assessment[triggerName] === 'Completed';
-    const isPreviousCompleted = isPreviousTriggerCompleted(triggerName);
-
-    // Only render if the current section has been completed
-    if (currentSection === sectionName) {
-      return (
-        <button
-          onClick={() => handleTriggerClick(triggerName)}
-          disabled={!canAccess || isCompleted || !isPreviousCompleted}
-        >
-          {isCompleted ? 'Completed' : 'Mark as Completed'}
-        </button>
-      );
-    }
-    return null;
-  };
-
-  const isPreviousTriggerCompleted = (currentTrigger) => {
-    const triggerOrder = Object.values(TRIGGERS);
-    const currentIndex = triggerOrder.indexOf(currentTrigger);
-    if (currentIndex === 0) return true;
-    const previousTrigger = triggerOrder[currentIndex - 1];
-    return assessment[previousTrigger] === 'Completed';
-  };
-
-  const handleInputChange = (e) => {
-    setAssessment({ ...assessment, [e.target.name]: e.target.value });
-  };
-
-  // Check if all fields in a section are filled
-  const areAllFieldsFilled = (fields) => {
-    return fields.every(field => {
-      const value = assessment[field.name];
-      return typeof value === 'string' ? value.trim() !== '' : value !== null && value !== undefined;
-    });
   
+      setCompletedSections(prevState => ({
+        ...prevState,
+        [section]: true
+      }));
+  
+      setIsEditMode(prevState => ({
+        ...prevState,
+        [section]: false,
+        ...(currentIndex < sections.length - 1 ? { [sections[currentIndex + 1]]: true } : {})
+      }));
+  
+      setTempFormData(prevState => {
+        const newState = { ...prevState };
+        delete newState[section];
+        return newState;
+      });
+  
+    } catch (err) {
+      console.error("Error updating assessment:", err);
+      setError(`Failed to update assessment: ${err.message}`);
+    }
   };
 
-  // Render each section with conditional buttons and section hiding
-  const renderSection = (sectionName, fields, role) => {
-    const canEdit = isUserAllowedToEdit(role) && editMode[sectionName];
-    const showSubmit = areAllFieldsFilled(fields);
+  const handleEdit = (section) => {
+    setTempFormData({
+      ...tempFormData,
+      [section]: { ...assessment }
+    });
 
-    return (
-      <div style={{ display: currentSection === sectionName || isPreviousTriggerCompleted(TRIGGERS[sectionName]) ? 'block' : 'none' }}>
-        <h2>{sectionName.replace(/_/g, ' ')}</h2>
-        <form onSubmit={(e) => handleSubmit(e, sectionName)}>
-          {fields.map(field => (
-            <div key={field.name}>
-              <label>
-                {field.label}:
-                {canEdit ? (
-                  <input
-                    type={field.type}
-                    name={field.name}
-                    value={assessment[field.name] || ''}
-                    onChange={handleInputChange}
-                    required
-                  />
-                ) : (
-                  <p>{assessment[field.name] || 'Not set'}</p>
-                )}
-              </label>
-            </div>
-          ))}
-          {isUserAllowedToEdit(role) && (
-            canEdit ? (
-              <>
-                {showSubmit && (
-                  <button type="submit">Submit {sectionName.replace(/_/g, ' ')}</button>
-                )}
-                <button type="button" onClick={() => setEditModeForSection(sectionName, false)}>
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button type="button" onClick={() => setEditModeForSection(sectionName, true)}>
-                Edit {sectionName.replace(/_/g, ' ')}
-              </button>
-            )
-          )}
-        </form>
-        {/* Render the trigger button after each section */}
-        {renderTriggerButton(TRIGGERS[sectionName], role, sectionName)}
-      </div>
-    );
+    setIsEditMode(prevState => ({
+      ...prevState,
+      [section]: true
+    }));
+
+    updateTrigger(section, 'Not Completed');
+    resetSectionsAfter(section);
+  };
+
+  const handleCancelEdit = (section) => {
+    setAssessment(prevState => ({
+      ...prevState,
+      ...tempFormData[section]
+    }));
+
+    setIsEditMode(prevState => ({
+      ...prevState,
+      [section]: false
+    }));
+
+    setTempFormData(prevState => {
+      const newState = { ...prevState };
+      delete newState[section];
+      return newState;
+    });
   };
 
   const isUserAllowedToEdit = useCallback((requiredRole) => {
     return assessment.userRoles && assessment.userRoles.includes(requiredRole);
   }, [assessment.userRoles]);
 
+  const renderSection = (sectionName, fields, role) => {
+    const triggerName = TRIGGERS[sectionName];
+    const isCompleted = assessment[triggerName] === 'Completed';
+    const isNotCompleted = assessment[triggerName] === 'Not Completed';
+    const canEdit = isUserAllowedToEdit(role);
+    const isEditing = isEditMode[sectionName];
+
+    const shouldRender = sectionName === SECTIONS.ASSESSMENT_DETAILS || 
+                         isCompleted || 
+                         isNotCompleted || 
+                         (Object.values(SECTIONS).indexOf(sectionName) > 0 && 
+                          assessment[TRIGGERS[Object.values(SECTIONS)[Object.values(SECTIONS).indexOf(sectionName) - 1]]] === 'Completed');
+
+    if (!shouldRender) {
+      return null;
+    }
+
+    return (
+      <div>
+        <h2>{sectionName.replace(/_/g, ' ')}</h2>
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(sectionName); }}>
+          {fields.map(field => (
+            <div key={field.name}>
+              <label>
+                {field.label}:
+                {canEdit ? (
+                  field.type === 'textarea' ? (
+                    <textarea
+                      name={field.name}
+                      value={assessment[field.name] || ''}
+                      onChange={(e) => handleInputChange(sectionName, field.name, e.target.value)}
+                      required
+                    />
+                  ) : field.type === 'select' ? (
+                    <select
+                      name={field.name}
+                      value={assessment[field.name] || ''}
+                      onChange={(e) => handleInputChange(sectionName, field.name, e.target.value)}
+                      required
+                    >
+                      <option value="">Select an option</option>
+                      {field.options.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={field.type}
+                      name={field.name}
+                      value={assessment[field.name] || ''}
+                      onChange={(e) => handleInputChange(sectionName, field.name, e.target.value)}
+                      required
+                    />
+                  )
+                ) : (
+                  <p>{assessment[field.name] || 'Not set'}</p>
+                )}
+              </label>
+            </div>
+          ))}
+          
+          {isUserAllowedToEdit(role) && (
+            completedSections[sectionName] ? (
+              isEditMode[sectionName] ? (
+                <>
+                  <button type="submit">Submit {sectionName.replace(/_/g, ' ')}</button>
+                  <button type="button" onClick={() => handleCancelEdit(sectionName)}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={() => handleEdit(sectionName)}>
+                  Edit {sectionName.replace(/_/g, ' ')}
+                </button>
+              )
+            ) : (
+              <button type="submit">Submit {sectionName.replace(/_/g, ' ')}</button>
+            )
+          )}
+        </form>
+      </div>
+    );
+  };
+
   if (loading) return <div>Loading...</div>;
+  if (error) return <div className="error">{error}</div>;
 
   return (
     <div className="eps-moderation-form">
       <h1>EPS Moderation Form</h1>
       {assessment.moduleCode && <ModuleDetails moduleCode={assessment.moduleCode} />}
-
-      {/* Render sections up to and including the current section */}
+      
       {renderSection(SECTIONS.ASSESSMENT_DETAILS, [
         { name: 'title', label: 'Title', type: 'text' },
         { name: 'skills', label: 'Skills', type: 'textarea' },
@@ -295,56 +354,455 @@ export default function ModerationForm({ assessmentId }) {
         { name: 'plannedIssueDate', label: 'Planned Issue Date', type: 'date' },
         { name: 'courseworkSubmissionDate', label: 'Coursework Submission Date', type: 'date' }
       ], ROLES.MODULE_ASSESSMENT_LEAD)}
-
-      {currentSection !== SECTIONS.ASSESSMENT_DETAILS && (
-        <>
-          {renderSection(SECTIONS.INTERNAL_MODERATION, [
-            { name: 'internalModeratorComments', label: 'Internal Moderator Comments', type: 'textarea' }
-          ], ROLES.INTERNAL_MODERATOR)}
-
-          {renderSection(SECTIONS.RESPONSE_TO_INTERNAL_MODERATOR, [
-            { name: 'responseToInternalModerator', label: 'Response to Internal Moderator', type: 'textarea' }
-          ], ROLES.MODULE_ASSESSMENT_LEAD)}
-
-          {renderSection(SECTIONS.EXTERNAL_EXAMINER_REVIEW, [
-            { name: 'externalExaminerComments', label: 'External Examiner Comments', type: 'textarea' },
-            { name: 'externalExaminerApproval', label: 'External Examiner Approval', type: 'select', options: [
-              { value: 'APPROVED', label: 'Approved' },
-              { value: 'NEEDS_REVISION', label: 'Needs Revision' }
-            ]}
-          ], ROLES.EXTERNAL_EXAMINER)}
-
-          {renderSection(SECTIONS.PROGRAMME_DIRECTOR_CONFIRMATION, [
-            { name: 'programmeDirectorApproval', label: 'Programme Director Approval', type: 'select', options: [
-              { value: 'APPROVED', label: 'Approved' },
-              { value: 'NEEDS_REVISION', label: 'Needs Revision' }
-            ]}
-          ], ROLES.PROGRAMME_DIRECTOR)}
-
-          {renderSection(SECTIONS.MODERATION_OF_MARKS, [
-            { name: 'assessmentDeadline', label: 'Assessment Deadline', type: 'date' },
-            { name: 'markingCompletedDate', label: 'Marking Completed Date', type: 'date' },
-            { name: 'moderationCompletedDate', label: 'Moderation Completed Date', type: 'date' },
-            { name: 'totalSubmissions', label: 'Total Submissions', type: 'number' },
-            { name: 'failedSubmissions', label: 'Failed Submissions', type: 'number' },
-            { name: 'moderatedSubmissions', label: 'Moderated Submissions', type: 'number' },
-            { name: 'teachingImpactDetails', label: 'Teaching Impact Details', type: 'textarea' }
-          ], ROLES.INTERNAL_MODERATOR)}
-
-          {renderSection(SECTIONS.ASSESSMENT_LEAD_STAGE_2, [
-            { name: 'stage2_assessmentLeadComments', label: 'Stage 2 Assessment Lead Comments', type: 'textarea' }
-          ], ROLES.MODULE_ASSESSMENT_LEAD)}
-
-          {renderSection(SECTIONS.FINAL_CONFIRMATION, [
-            { name: 'programmeDirectorConfirmation_signature_stage2', label: 'Programme Director Final Confirmation', type: 'text' }
-          ], ROLES.PROGRAMME_DIRECTOR)}
-        </>
-      )}
+  
+      {(assessment.assessmentDetailsTrigger === 'Completed' || assessment.internalModeratorDetailsTrigger === 'Not Completed') && renderSection(SECTIONS.INTERNAL_MODERATION, [
+        { name: 'internalModeratorComments', label: 'Internal Moderator Comments', type: 'textarea' }
+      ], ROLES.INTERNAL_MODERATOR)}
+      
+      {(assessment.internalModeratorDetailsTrigger === 'Completed' || assessment.externalExaminerDetailsTrigger === 'Not Completed') && renderSection(SECTIONS.RESPONSE_TO_INTERNAL_MODERATOR, [
+        { name: 'responseToInternalModerator', label: 'Response to Internal Moderator', type: 'textarea' }
+      ], ROLES.MODULE_ASSESSMENT_LEAD)}
+      
+      {(assessment.internalModeratorDetailsTrigger === 'Completed' || assessment.externalExaminerDetailsTrigger === 'Not Completed') && renderSection(SECTIONS.EXTERNAL_EXAMINER_REVIEW, [
+        { name: 'externalExaminerComments', label: 'External Examiner Comments', type: 'textarea' },
+        { name: 'externalExaminerApproval', label: 'External Examiner Approval', type: 'select', options: [
+          { value: 'APPROVED', label: 'Approved' },
+          { value: 'NEEDS_REVISION', label: 'Needs Revision' }
+        ]}
+      ], ROLES.EXTERNAL_EXAMINER)}
+      
+      {(assessment.externalExaminerDetailsTrigger === 'Completed' || assessment.programmeDirectorDetailsTrigger === 'Not Completed') && renderSection(SECTIONS.RESPONSE_TO_EXTERNAL_EXAMINER, [
+        { name: 'responseToExternalExaminer', label: 'Response to External Examiner', type: 'textarea' }
+      ], ROLES.MODULE_ASSESSMENT_LEAD)}
+      
+      {(assessment.externalExaminerDetailsTrigger === 'Completed' || assessment.programmeDirectorDetailsTrigger === 'Not Completed') && renderSection(SECTIONS.PROGRAMME_DIRECTOR_CONFIRMATION, [
+        { name: 'programmeDirectorApproval', label: 'Programme Director Approval', type: 'select', options: [
+          { value: 'APPROVED', label: 'Approved' },
+          { value: 'NEEDS_REVISION', label: 'Needs Revision' }
+        ]}
+      ], ROLES.PROGRAMME_DIRECTOR)}
+      
+      {(assessment.programmeDirectorDetailsTrigger === 'Completed' || assessment.internalModeratorModerationOfMarksTrigger === 'Not Completed') && renderSection(SECTIONS.MODERATION_OF_MARKS, [
+        { name: 'assessmentDeadline', label: 'Assessment Deadline', type: 'date' },
+        { name: 'markingCompletedDate', label: 'Marking Completed Date', type: 'date' },
+        { name: 'moderationCompletedDate', label: 'Moderation Completed Date', type: 'date' },
+        { name: 'totalSubmissions', label: 'Total Submissions', type: 'number' },
+        { name: 'failedSubmissions', label: 'Failed Submissions', type: 'number' },
+        { name: 'moderatedSubmissions', label: 'Moderated Submissions', type: 'number' },
+        { name: 'teachingImpactDetails', label: 'Teaching Impact Details', type: 'textarea' },
+        { name: 'stage2_moderatorComments', label: 'Stage 2 Moderator Comments', type: 'textarea' }
+      ], ROLES.INTERNAL_MODERATOR)}
+      
+      {(assessment.internalModeratorModerationOfMarksTrigger === 'Completed' || assessment.stage2ModuleAssessmentLeadCommentsTrigger === 'Not Completed') && renderSection(SECTIONS.ASSESSMENT_LEAD_STAGE_2, [
+        { name: 'stage2_assessmentLeadComments', label: 'Stage 2 Assessment Lead Comments', type: 'textarea' }
+      ], ROLES.MODULE_ASSESSMENT_LEAD)}
+      
+      {assessment.stage2ModuleAssessmentLeadCommentsTrigger === 'Completed' && renderSection(SECTIONS.FINAL_CONFIRMATION, [
+        { name: 'programmeDirectorConfirmation_signature_stage2', label: 'Programme Director Final Confirmation', type: 'text' }
+      ], ROLES.PROGRAMME_DIRECTOR)}
     </div>
   );
 }
 
 
+
+//v5
+// import React, { useState, useEffect, useCallback } from 'react';
+// import axiosInstance from '@/utils/axios';
+// import ModuleDetails from '../moduleDetails/page';
+// import Cookies from 'js-cookie';
+
+// const ROLES = {
+//   MODULE_ASSESSMENT_LEAD: 'MODULE_ASSESSMENT_LEAD',
+//   INTERNAL_MODERATOR: 'INTERNAL_MODERATOR',
+//   EXTERNAL_EXAMINER: 'EXTERNAL_EXAMINER',
+//   PROGRAMME_DIRECTOR: 'PROGRAMME_DIRECTOR'
+// };
+
+// const SECTIONS = {
+//   ASSESSMENT_DETAILS: 'ASSESSMENT_DETAILS',
+//   INTERNAL_MODERATION: 'INTERNAL_MODERATION',
+//   RESPONSE_TO_INTERNAL_MODERATOR: 'RESPONSE_TO_INTERNAL_MODERATOR',
+//   EXTERNAL_EXAMINER_REVIEW: 'EXTERNAL_EXAMINER_REVIEW',
+//   RESPONSE_TO_EXTERNAL_EXAMINER: 'RESPONSE_TO_EXTERNAL_EXAMINER',
+//   PROGRAMME_DIRECTOR_CONFIRMATION: 'PROGRAMME_DIRECTOR_CONFIRMATION',
+//   MODERATION_OF_MARKS: 'MODERATION_OF_MARKS',
+//   ASSESSMENT_LEAD_STAGE_2: 'ASSESSMENT_LEAD_STAGE_2',
+//   FINAL_CONFIRMATION: 'FINAL_CONFIRMATION'
+// };
+
+// const TRIGGERS = {
+//   ASSESSMENT_DETAILS: 'assessmentDetailsTrigger',
+//   INTERNAL_MODERATION: 'internalModeratorDetailsTrigger',
+//   EXTERNAL_EXAMINER_REVIEW: 'externalExaminerDetailsTrigger',
+//   PROGRAMME_DIRECTOR_CONFIRMATION: 'programmeDirectorDetailsTrigger',
+//   MODERATION_OF_MARKS: 'internalModeratorModerationOfMarksTrigger',
+//   ASSESSMENT_LEAD_STAGE_2: 'stage2ModuleAssessmentLeadCommentsTrigger',
+//   FINAL_CONFIRMATION: 'finalConfirmationTrigger'
+// };
+
+// export default function ModerationForm({ assessmentId }) {
+//   const [assessment, setAssessment] = useState({
+//     id: '',
+//     title: '',
+//     moduleCode: '',
+//     moduleLeader: '',
+//     assessmentWeighting: '',
+//     assessmentCategory: '',
+//     skills: '',
+//     plannedIssueDate: '',
+//     courseworkSubmissionDate: '',
+//     moduleAssessmentLeadSignature: '',
+//     moduleAssessmentLeadSignatureDateTime: null,
+//     internalModeratorComments: '',
+//     internalModeratorSignature: '',
+//     internalModeratorSignatureDateTime: null,
+//     responseToInternalModerator: '',
+//     externalExaminerComments: '',
+//     externalExaminerApproval: '',
+//     externalExaminer_signature: '',
+//     externalExaminerSignatureDateTime: null,
+//     responseToExternalExaminer: '',
+//     programmeDirectorApproval: '',
+//     programmeDirectorSignatureDateTime: null,
+//     programmeDirectorConfirmation_signature: 'Pending',
+//     assessmentDeadline: '',
+//     markingCompletedDate: '',
+//     moderationCompletedDate: '',
+//     totalSubmissions: '',
+//     failedSubmissions: '',
+//     moderatedSubmissions: '',
+//     teachingImpactDetails: '',
+//     stage2_moderatorComments: '',
+//     moderatorSignatureDateTime: null,
+//     stage2_assessmentLeadComments: '',
+//     stage2ModuleAssessmentLeadSignatureDateTime: null,
+//     programmeDirectorConfirmation_signature_stage2: '',
+//     userRoles: [],
+//     participants: [],
+//     assessmentDetailsTrigger: 'Not Completed',
+//     internalModeratorDetailsTrigger: 'Not Completed',
+//     externalExaminerDetailsTrigger: 'Not Completed',
+//     programmeDirectorDetailsTrigger: 'Not Completed',
+//     internalModeratorModerationOfMarksTrigger: 'Not Completed',
+//     stage2ModuleAssessmentLeadCommentsTrigger: 'Not Completed',
+//     finalConfirmationTrigger: 'Not Completed'
+//   });
+
+//   const [completedSections, setCompletedSections] = useState({
+//     ASSESSMENT_DETAILS: false,
+//     INTERNAL_MODERATION: false,
+//     RESPONSE_TO_INTERNAL_MODERATOR: false,
+//     EXTERNAL_EXAMINER_REVIEW: false,
+//     RESPONSE_TO_EXTERNAL_EXAMINER: false,
+//     PROGRAMME_DIRECTOR_CONFIRMATION: false,
+//     MODERATION_OF_MARKS: false,
+//     ASSESSMENT_LEAD_STAGE_2: false,
+//     FINAL_CONFIRMATION: false
+//   });
+
+//   const [isEditMode, setIsEditMode] = useState({
+//     ASSESSMENT_DETAILS: true,
+//     INTERNAL_MODERATION: false,
+//     RESPONSE_TO_INTERNAL_MODERATOR: false,
+//     EXTERNAL_EXAMINER_REVIEW: false,
+//     RESPONSE_TO_EXTERNAL_EXAMINER: false,
+//     PROGRAMME_DIRECTOR_CONFIRMATION: false,
+//     MODERATION_OF_MARKS: false,
+//     ASSESSMENT_LEAD_STAGE_2: false,
+//     FINAL_CONFIRMATION: false
+//   });
+
+//   const [tempFormData, setTempFormData] = useState({});
+//   const [error, setError] = useState('');
+//   const [loading, setLoading] = useState(true);
+//   const [participants, setParticipants] = useState([]);
+
+//   useEffect(() => {
+//     const fetchAssessment = async () => {
+//       setLoading(true);
+//       try {
+//         const [assessmentResponse, participantsResponse] = await Promise.all([
+//           axiosInstance.get(`/api/v1/assessments/${assessmentId}`),
+//           axiosInstance.get(`/api/v1/assessments/${assessmentId}/participants`)
+//         ]);
+        
+//         setAssessment({
+//           ...assessmentResponse.data,
+//           userRoles: assessmentResponse.data.userRoles || []
+//         });
+        
+//         setParticipants(participantsResponse.data);
+//       } catch (err) {
+//         console.error("Error fetching assessment:", err);
+//         setError(`Failed to fetch assessment data: ${err.message}`);
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
+    
+//     if (assessmentId) {
+//       fetchAssessment();
+//     }
+//   }, [assessmentId]);
+
+//   const handleInputChange = (section, field, value) => {
+//     setAssessment(prevAssessment => ({
+//       ...prevAssessment,
+//       [field]: value
+//     }));
+//   };
+
+//   const updateTrigger = (section, status) => {
+//     const triggerName = TRIGGERS[section];
+//     if (triggerName) {
+//       setAssessment(prevAssessment => ({
+//         ...prevAssessment,
+//         [triggerName]: status
+//       }));
+//     }
+//   };
+
+//   const resetSectionsAfter = (editedSection) => {
+//     const sectionsOrder = Object.values(SECTIONS);
+//     const triggerOrder = Object.values(TRIGGERS);
+    
+//     let shouldReset = false;
+//     sectionsOrder.forEach((section, index) => {
+//       if (shouldReset) {
+//         setCompletedSections(prevState => ({
+//           ...prevState,
+//           [section]: false
+//         }));
+//         updateTrigger(section, 'Not Completed');
+//       }
+//       if (section === editedSection) {
+//         shouldReset = true;
+//       }
+//     });
+//   };
+
+//   const handleSubmit = async (section) => {
+//     try {
+//       // Update the current section's trigger to 'Completed'
+//       updateTrigger(section, 'Completed');
+      
+//       const response = await axiosInstance.put(`/api/v1/assessments/${assessmentId}`, assessment);
+//       setAssessment(response.data);
+  
+//       setCompletedSections(prevState => ({
+//         ...prevState,
+//         [section]: true
+//       }));
+  
+//       setIsEditMode(prevState => ({
+//         ...prevState,
+//         [section]: false
+//       }));
+  
+//       setTempFormData(prevState => {
+//         const newState = { ...prevState };
+//         delete newState[section];
+//         return newState;
+//       });
+  
+//       // Find the next section and update its trigger
+//       const sections = Object.values(SECTIONS);
+//       const currentIndex = sections.indexOf(section);
+//       if (currentIndex < sections.length - 1) {
+//         const nextSection = sections[currentIndex + 1];
+//         updateTrigger(nextSection, 'Not Completed');
+//         setIsEditMode(prevState => ({
+//           ...prevState,
+//           [nextSection]: true
+//         }));
+//       }
+  
+//       // Update the assessment state to reflect the changes
+//       setAssessment(prevAssessment => ({
+//         ...prevAssessment,
+//         [TRIGGERS[section]]: 'Completed',
+//         ...(currentIndex < sections.length - 1 ? { [TRIGGERS[sections[currentIndex + 1]]]: 'Not Completed' } : {})
+//       }));
+  
+//     } catch (err) {
+//       console.error("Error updating assessment:", err);
+//       setError(`Failed to update assessment: ${err.message}`);
+//     }
+//   };
+
+//   const handleEdit = (section) => {
+//     setTempFormData({
+//       ...tempFormData,
+//       [section]: { ...assessment }
+//     });
+
+//     setIsEditMode(prevState => ({
+//       ...prevState,
+//       [section]: true
+//     }));
+
+//     updateTrigger(section, 'Not Completed');
+//     resetSectionsAfter(section);
+//   };
+
+//   const handleCancelEdit = (section) => {
+//     setAssessment(prevState => ({
+//       ...prevState,
+//       ...tempFormData[section]
+//     }));
+
+//     setIsEditMode(prevState => ({
+//       ...prevState,
+//       [section]: false
+//     }));
+
+//     setTempFormData(prevState => {
+//       const newState = { ...prevState };
+//       delete newState[section];
+//       return newState;
+//     });
+//   };
+
+//   const isUserAllowedToEdit = useCallback((requiredRole) => {
+//     return assessment.userRoles && assessment.userRoles.includes(requiredRole);
+//   }, [assessment.userRoles]);
+
+//   const renderSection = (sectionName, fields, role) => {
+//     const canEdit = isUserAllowedToEdit(role) && isEditMode[sectionName];
+
+//     return (
+//       <div>
+//         <h2>{sectionName.replace(/_/g, ' ')}</h2>
+//         <form onSubmit={(e) => { e.preventDefault(); handleSubmit(sectionName); }}>
+//           {fields.map(field => (
+//             <div key={field.name}>
+//               <label>
+//                 {field.label}:
+//                 {canEdit ? (
+//                   field.type === 'textarea' ? (
+//                     <textarea
+//                       name={field.name}
+//                       value={assessment[field.name] || ''}
+//                       onChange={(e) => handleInputChange(sectionName, field.name, e.target.value)}
+//                       required
+//                     />
+//                   ) : field.type === 'select' ? (
+//                     <select
+//                       name={field.name}
+//                       value={assessment[field.name] || ''}
+//                       onChange={(e) => handleInputChange(sectionName, field.name, e.target.value)}
+//                       required
+//                     >
+//                       <option value="">Select an option</option>
+//                       {field.options.map(option => (
+//                         <option key={option.value} value={option.value}>{option.label}</option>
+//                       ))}
+//                     </select>
+//                   ) : (
+//                     <input
+//                       type={field.type}
+//                       name={field.name}
+//                       value={assessment[field.name] || ''}
+//                       onChange={(e) => handleInputChange(sectionName, field.name, e.target.value)}
+//                       required
+//                     />
+//                   )
+//                 ) : (
+//                   <p>{assessment[field.name] || 'Not set'}</p>
+//                 )}
+//               </label>
+//             </div>
+//           ))}
+          
+//           {isUserAllowedToEdit(role) && (
+//             completedSections[sectionName] ? (
+//               isEditMode[sectionName] ? (
+//                 <>
+//                   <button type="submit">Submit {sectionName.replace(/_/g, ' ')}</button>
+//                   <button type="button" onClick={() => handleCancelEdit(sectionName)}>
+//                     Cancel
+//                   </button>
+//                 </>
+//               ) : (
+//                 <button type="button" onClick={() => handleEdit(sectionName)}>
+//                   Edit {sectionName.replace(/_/g, ' ')}
+//                 </button>
+//               )
+//             ) : (
+//               <button type="submit">Submit {sectionName.replace(/_/g, ' ')}</button>
+//             )
+//           )}
+//         </form>
+//       </div>
+//     );
+//   };
+
+//   if (loading) return <div>Loading...</div>;
+//   if (error) return <div className="error">{error}</div>;
+
+//   return (
+//     <div className="eps-moderation-form">
+//       <h1>EPS Moderation Form</h1>
+//       {assessment.moduleCode && <ModuleDetails moduleCode={assessment.moduleCode} />}
+      
+//       {renderSection(SECTIONS.ASSESSMENT_DETAILS, [
+//         { name: 'title', label: 'Title', type: 'text' },
+//         { name: 'skills', label: 'Skills', type: 'textarea' },
+//         { name: 'assessmentCategory', label: 'Assessment Category', type: 'text' },
+//         { name: 'assessmentWeighting', label: 'Assessment Weighting', type: 'number' },
+//         { name: 'plannedIssueDate', label: 'Planned Issue Date', type: 'date' },
+//         { name: 'courseworkSubmissionDate', label: 'Coursework Submission Date', type: 'date' }
+//       ], ROLES.MODULE_ASSESSMENT_LEAD)}
+  
+//       {(assessment.assessmentDetailsTrigger === 'Completed' || assessment.internalModeratorDetailsTrigger === 'Not Completed') && renderSection(SECTIONS.INTERNAL_MODERATION, [
+//         { name: 'internalModeratorComments', label: 'Internal Moderator Comments', type: 'textarea' }
+//       ], ROLES.INTERNAL_MODERATOR)}
+      
+//       {(assessment.internalModeratorDetailsTrigger === 'Completed' || assessment.externalExaminerDetailsTrigger === 'Not Completed') && renderSection(SECTIONS.RESPONSE_TO_INTERNAL_MODERATOR, [
+//         { name: 'responseToInternalModerator', label: 'Response to Internal Moderator', type: 'textarea' }
+//       ], ROLES.MODULE_ASSESSMENT_LEAD)}
+      
+//       {(assessment.internalModeratorDetailsTrigger === 'Completed' || assessment.externalExaminerDetailsTrigger === 'Not Completed') && renderSection(SECTIONS.EXTERNAL_EXAMINER_REVIEW, [
+//         { name: 'externalExaminerComments', label: 'External Examiner Comments', type: 'textarea' },
+//         { name: 'externalExaminerApproval', label: 'External Examiner Approval', type: 'select', options: [
+//           { value: 'APPROVED', label: 'Approved' },
+//           { value: 'NEEDS_REVISION', label: 'Needs Revision' }
+//         ]}
+//       ], ROLES.EXTERNAL_EXAMINER)}
+      
+//       {(assessment.externalExaminerDetailsTrigger === 'Completed' || assessment.programmeDirectorDetailsTrigger === 'Not Completed') && renderSection(SECTIONS.RESPONSE_TO_EXTERNAL_EXAMINER, [
+//         { name: 'responseToExternalExaminer', label: 'Response to External Examiner', type: 'textarea' }
+//       ], ROLES.MODULE_ASSESSMENT_LEAD)}
+      
+//       {(assessment.externalExaminerDetailsTrigger === 'Completed' || assessment.programmeDirectorDetailsTrigger === 'Not Completed') && renderSection(SECTIONS.PROGRAMME_DIRECTOR_CONFIRMATION, [
+//         { name: 'programmeDirectorApproval', label: 'Programme Director Approval', type: 'select', options: [
+//           { value: 'APPROVED', label: 'Approved' },
+//           { value: 'NEEDS_REVISION', label: 'Needs Revision' }
+//         ]}
+//       ], ROLES.PROGRAMME_DIRECTOR)}
+      
+//       {(assessment.programmeDirectorDetailsTrigger === 'Completed' || assessment.internalModeratorModerationOfMarksTrigger === 'Not Completed') && renderSection(SECTIONS.MODERATION_OF_MARKS, [
+//         { name: 'assessmentDeadline', label: 'Assessment Deadline', type: 'date' },
+//         { name: 'markingCompletedDate', label: 'Marking Completed Date', type: 'date' },
+//         { name: 'moderationCompletedDate', label: 'Moderation Completed Date', type: 'date' },
+//         { name: 'totalSubmissions', label: 'Total Submissions', type: 'number' },
+//         { name: 'failedSubmissions', label: 'Failed Submissions', type: 'number' },
+//         { name: 'moderatedSubmissions', label: 'Moderated Submissions', type: 'number' },
+//         { name: 'teachingImpactDetails', label: 'Teaching Impact Details', type: 'textarea' },
+//         { name: 'stage2_moderatorComments', label: 'Stage 2 Moderator Comments', type: 'textarea' }
+//       ], ROLES.INTERNAL_MODERATOR)}
+      
+//       {(assessment.internalModeratorModerationOfMarksTrigger === 'Completed' || assessment.stage2ModuleAssessmentLeadCommentsTrigger === 'Not Completed') && renderSection(SECTIONS.ASSESSMENT_LEAD_STAGE_2, [
+//         { name: 'stage2_assessmentLeadComments', label: 'Stage 2 Assessment Lead Comments', type: 'textarea' }
+//       ], ROLES.MODULE_ASSESSMENT_LEAD)}
+      
+//       {assessment.stage2ModuleAssessmentLeadCommentsTrigger === 'Completed' && renderSection(SECTIONS.FINAL_CONFIRMATION, [
+//         { name: 'programmeDirectorConfirmation_signature_stage2', label: 'Programme Director Final Confirmation', type: 'text' }
+//       ], ROLES.PROGRAMME_DIRECTOR)}
+//     </div>
+//   );
+// }
 
 
 

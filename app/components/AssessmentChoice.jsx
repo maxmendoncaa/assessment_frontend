@@ -39,17 +39,35 @@ export default function AssessmentChoicePage({ moduleId }) {
 
   return (
     <div className="assessment-choice-container">
-      <h1>Assessments</h1>
-      <div className="assessments-grid">
-        {assessments.map(assessment => (
-          <div key={assessment.id} className="assessment-card" onClick={() => handleAssessmentClick(assessment.id)}>
-            <h3>{assessment.title}</h3>
-            <p>Category: {assessment.assessmentCategory}</p>
-            <p>Weighting: {assessment.assessmentWeighting}%</p>
-            <p>Your Role: {assessment.userRole}</p>
-          </div>
-        ))}
-      </div>
-    </div>
+  <h1 style={{ paddingLeft: '10px' }}>Assessments</h1>
+  <div className="assessments-grid">
+    {assessments.map(assessment => {
+      // Replace underscores with spaces and join roles with commas
+      const formattedRoles = assessment.userRoles.map(role => role.replace(/_/g, ' ')).join(', ');
+
+      return (
+        <div
+          key={assessment.id}
+          className="assessment-card"
+          onClick={() => handleAssessmentClick(assessment.id)}
+          style={{
+            border: '1px solid #ccc',
+            padding: '10px',
+            margin: '10px',
+            borderRadius: '5px'
+          }}
+        >
+          <h3>{assessment.title}</h3>
+          <p>Category: {assessment.assessmentCategory}</p>
+          <p>Weighting: {assessment.assessmentWeighting}%</p>
+          <p>Your Role: {formattedRoles}</p>
+        </div>
+      );
+    })}
+  </div>
+</div>
+
   );
+  
+  
 }
