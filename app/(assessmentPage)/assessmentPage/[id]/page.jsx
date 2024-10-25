@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import ModerationForm_2 from '@/app/components/ModerationForm_2';
+import ModerationForm_2 from '@/components/ModerationForm_2';
 
 export default function AssessmentPage({ params }) {
   return <ModerationForm_2 assessmentId={params.id} />;

@@ -12,6 +12,7 @@
     "@react-pdf/renderer": "^4.0.0",
     "axios": "^1.7.7",
     "bootstrap": "^5.3.3",
+    "bootstrap-icons": "^1.11.3",
     "cookie": "^0.6.0",
     "date-fns": "^4.1.0",
     "i": "^0.3.7",

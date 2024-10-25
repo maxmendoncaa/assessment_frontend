@@ -1,9 +1,8 @@
 import { Inter } from "next/font/google";
-import "./globals.css";
+import "../styles/globals.css";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
 import Cookies from 'js-cookie';
-import SideBar from './components/SideBar'
 import { Container, Row, Col } from 'react-bootstrap';
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,7 +27,10 @@ const RootLayout=({ children })=> {
           <h6>{Cookies.get('name')}</h6>
         </div>
       </div>
-      <Container fluid>
+      <div style={{width:'100%'}}>
+      {children}
+      </div>
+      {/* <Container fluid>
           <Row>
             <Col className="sidebar-container" xs={3}>
               <SideBar />
@@ -37,7 +39,7 @@ const RootLayout=({ children })=> {
               <main>{children}</main>
             </Col>
           </Row>
-        </Container>
+        </Container> */}
       </body>
     
     </html>

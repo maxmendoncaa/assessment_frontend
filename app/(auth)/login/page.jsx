@@ -1,18 +1,23 @@
 'use client';
 
 import axiosInstance from '@/utils/axios';
-import axios from 'axios';
-// import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Cookies from 'js-cookie';
-// import { redirect } from 'next/navigation';
+import { Button, Form } from 'react-bootstrap';
 
-const LoginPage = () => {
+
+const page = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   // const router = useRouter(); // Use router for redirection
 
+  useEffect(()=>{
+    if(Cookies.get('role')==='ADMIN')
+      {
+        window.location.href = "/admin" 
+      }
+  },[])
   const handleSubmit =  (e) => {
     e.preventDefault();
    // setError(''); // Reset error state
@@ -24,9 +29,12 @@ const LoginPage = () => {
           console.log(data)
           Cookies.set('token',data.data.access_token)
           Cookies.set('email',data.data.user.email)
+          Cookies.set('userId',data.data.user.userId)
+          Cookies.set('role',data.data.user.role)
           
         }).then(()=>{
           // redirect("/dashboard")
+          
           window.location.href="/dashboard"
         }).catch((err)=>{
           setError(err.message);
@@ -51,11 +59,21 @@ const LoginPage = () => {
     // }
   };
 
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '50px' }}>
-      <h2 style={{ textAlign: 'center', fontSize: '24px', marginBottom: '20px' }}><b>Login</b></h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '300px' }}>
-        <input
+      <img 
+        src="/astonlogo.png" 
+        alt="Aston University Login" 
+        style={{ 
+          width: '400px',  // Adjust width as needed
+          marginBottom: '0px',
+          objectFit: 'contain',
+          scale:'110%'
+        }} 
+      /><br></br>
+      <Form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '300px' }}>
+        <Form.Control
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -63,7 +81,7 @@ const LoginPage = () => {
           required
           style={{ width: '100%', padding: '10px', marginBottom: '15px', textAlign: 'center' }}
         />
-        <input
+        <Form.Control
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -72,10 +90,10 @@ const LoginPage = () => {
           style={{ width: '100%', padding: '10px', marginBottom: '15px', textAlign: 'center' }}
         />
         {error && <p style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
-        <button type="submit" style={{ padding: '10px 20px' }}>Login</button>
-      </form>
+        <Button type="submit" style={{ padding: '10px 20px' }}>Login</Button>
+      </Form>
     </div>
   );
 };
 
-export default LoginPage;
+export default page;

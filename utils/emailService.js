@@ -35,8 +35,9 @@ export const notifyExternalExaminer = async (examinerEmail, assessmentDetails) =
 
     You are requested to review the following assessment:
 
-    Title: ${assessmentDetails.title}
+    Assessment Title: ${assessmentDetails.title}
     Module: ${assessmentDetails.module}
+    Module Code:${assessmentDetails.moduleCode}
     Due Date: ${assessmentDetails.dueDate}
 
     Please log in to the system to provide your feedback.
@@ -61,8 +62,9 @@ export const notifyInternalModerator = async (moderatorEmail, assessmentDetails)
 
     An assessment requires your moderation:
 
-    Title: ${assessmentDetails.title}
+    Assessment Title: ${assessmentDetails.title}
     Module: ${assessmentDetails.module}
+    Module Code:${assessmentDetails.moduleCode}
     Due Date: ${assessmentDetails.dueDate}
 
     Please log in to the system to complete the moderation process.
@@ -87,8 +89,9 @@ export const notifyProgrammeDirector = async (directorEmail, assessmentDetails) 
 
     An assessment requires your approval:
 
-    Title: ${assessmentDetails.title}
+    Assessment Title: ${assessmentDetails.title}
     Module: ${assessmentDetails.module}
+    Module Code:${assessmentDetails.moduleCode}
     Due Date: ${assessmentDetails.dueDate}
 
     Please log in to the system to review and approve the assessment.

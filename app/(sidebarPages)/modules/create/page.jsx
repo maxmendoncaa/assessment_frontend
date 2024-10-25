@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 import axiosInstance from "@/utils/axios";
 import { useRouter } from "next/navigation";
@@ -669,4 +670,3 @@ mitigating solutions to...."
     </>
   );
 }
-//like how i create modules using the page below, i want a manage modules page which would manage a module allowing features like deleting a module or deleting an existing assessment or changing roles of each participant in the assessments. also allow editing of module details . give me backend for this too

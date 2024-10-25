@@ -31,7 +31,8 @@ export default function AssessmentChoicePage({ moduleId }) {
 
   
   const handleAssessmentClick = (assessmentId) => {
-    router.push(`/assessmentPage/${assessmentId}`);
+    // router.push(`/assessmentPage/${assessmentId}`);
+    router.push(`/assessmentPage/${assessmentId}?moduleId=${moduleId}`);
   };
 
   if (error) return <div className="error-message">Error: {error}</div>;
