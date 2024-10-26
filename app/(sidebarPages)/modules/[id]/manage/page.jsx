@@ -1,5 +1,3 @@
-
-
 "use client"
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
@@ -19,26 +17,51 @@ export default function ManageModule() {
   const [moduleData, setModuleData] = useState(null);
   const [assessments, setAssessments] = useState([]);
   const [users, setUsers] = useState([]);
-  const [newParticipants, setNewParticipants] = useState([]);
+  const [newParticipants, setNewParticipants] = useState({});  // Changed to object with assessmentId as key
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [changedRoles, setChangedRoles] = useState({});
-  const [currentAssessmentId, setCurrentAssessmentId] = useState(null);
+  const [isAssessmentLead, setIsAssessmentLead] = useState(false);
+  const [editingModule, setEditingModule] = useState(false);
+  const [moduleFormData, setModuleFormData] = useState({
+    moduleName: '',
+    moduleCode: '',
+    credits: '',
+    level: '',
+    moduleOutcomes: ''
+  });
+  const [newAssessments, setNewAssessments] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const moduleId = params.id;
-        const [moduleResponse, assessmentsResponse, usersResponse] = await Promise.all([
+        const [moduleResponse, assessmentsResponse, usersResponse, isLeadResponse] = await Promise.all([
           axiosInstance.get(`/api/v1/modules/${moduleId}`),
           axiosInstance.get(`/api/v1/modules/${moduleId}/assessments/user`),
           axiosInstance.get('/api/v1/users/all'),
+          axiosInstance.get(`/api/v1/modules/${moduleId}/is-assessment-lead`)
         ]);
 
         setModuleData(moduleResponse.data);
+        setModuleFormData({
+          moduleName: moduleResponse.data.moduleName,
+          moduleCode: moduleResponse.data.moduleCode,
+          credits: moduleResponse.data.credits,
+          level: moduleResponse.data.level,
+          moduleOutcomes: moduleResponse.data.moduleOutcomes
+        });
         setAssessments(assessmentsResponse.data);
         setUsers(usersResponse.data);
+        setIsAssessmentLead(isLeadResponse.data);
+
+        // Initialize newParticipants for each assessment
+        const initialNewParticipants = {};
+        assessmentsResponse.data.forEach(assessment => {
+          initialNewParticipants[assessment.id] = [];
+        });
+        setNewParticipants(initialNewParticipants);
       } catch (err) {
         setError('Failed to fetch data: ' + err.message);
       } finally {
@@ -48,6 +71,26 @@ export default function ManageModule() {
 
     fetchData();
   }, [params.id]);
+
+  const handleModuleFormChange = (e) => {
+    setModuleFormData({
+      ...moduleFormData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleModuleSubmit = async () => {
+    try {
+      await axiosInstance.put(`/api/v1/modules/${moduleData.id}`, moduleFormData);
+      setSuccess('Module updated successfully');
+      setEditingModule(false);
+      // Refresh module data
+      const moduleResponse = await axiosInstance.get(`/api/v1/modules/${moduleData.id}`);
+      setModuleData(moduleResponse.data);
+    } catch (err) {
+      setError('Failed to update module: ' + err.message);
+    }
+  };
 
   const handleRoleChange = (assessmentId, participantId, role) => {
     setChangedRoles(prevChangedRoles => {
@@ -67,65 +110,164 @@ export default function ManageModule() {
     });
   };
 
-  const handleNewParticipantRoleChange = (index, role) => {
+  const addNewParticipantContainer = (assessmentId) => {
+    setNewParticipants(prev => ({
+      ...prev,
+      [assessmentId]: [...(prev[assessmentId] || []), { userId: null, roles: [] }]
+    }));
+  };
+
+  const handleNewParticipantRoleChange = (assessmentId, index, role) => {
     setNewParticipants(prev => {
-      const newRoles = new Set(prev[index].roles);
-      if (newRoles.has(role)) {
-        newRoles.delete(role);
+      const newParticipantsForAssessment = [...prev[assessmentId]];
+      const currentRoles = new Set(newParticipantsForAssessment[index].roles);
+      
+      if (currentRoles.has(role)) {
+        currentRoles.delete(role);
       } else {
-        newRoles.add(role);
+        currentRoles.add(role);
       }
-      const updatedParticipants = [...prev];
-      updatedParticipants[index] = { ...updatedParticipants[index], roles: Array.from(newRoles) };
-      return updatedParticipants;
+      
+      newParticipantsForAssessment[index] = {
+        ...newParticipantsForAssessment[index],
+        roles: Array.from(currentRoles)
+      };
+
+      return {
+        ...prev,
+        [assessmentId]: newParticipantsForAssessment
+      };
     });
   };
 
-  const addNewParticipantContainer = () => {
-    setNewParticipants(prev => [...prev, { userId: null, roles: [] }]);
-  };
-
-  const handleSelectUser = (index, selectedOption) => {
+  const handleSelectUser = (assessmentId, index, selectedOption) => {
     setNewParticipants(prev => {
-      const updatedParticipants = [...prev];
-      updatedParticipants[index] = { ...updatedParticipants[index], userId: selectedOption.value };
-      return updatedParticipants;
+      const updatedParticipants = [...prev[assessmentId]];
+      updatedParticipants[index] = {
+        ...updatedParticipants[index],
+        userId: selectedOption.value
+      };
+      return {
+        ...prev,
+        [assessmentId]: updatedParticipants
+      };
     });
+  };
+
+  const validateRoles = (assessment) => {
+    const allRoles = Object.values(AssessmentRoles);
+    const assignedRoles = new Set();
+    
+    // Check existing participants
+    assessment.participants.forEach(participant => {
+      const key = `${assessment.id}-${participant.userId}`;
+      const participantRoles = changedRoles[key] || participant.roles;
+      participantRoles.forEach(role => assignedRoles.add(role));
+    });
+
+    // Check new participants
+    (newParticipants[assessment.id] || []).forEach(participant => {
+      participant.roles.forEach(role => assignedRoles.add(role));
+    });
+
+    const missingRoles = allRoles.filter(role => !assignedRoles.has(role));
+    if (missingRoles.length > 0) {
+      setError(`Missing required roles: ${missingRoles.join(', ')}`);
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmitChanges = async (assessmentId) => {
     const assessment = assessments.find(a => a.id === assessmentId);
 
-    // Save changes for existing participants
-    for (const participant of assessment.participants) {
-      const key = `${assessmentId}-${participant.userId}`;
-      const roles = changedRoles[key] || participant.roles;
-
-      try {
-        await axiosInstance.put(`/api/v1/modules/${moduleData.id}/assessments/${assessmentId}/participants/${participant.userId}`, roles);
-      } catch (err) {
-        setError(`Failed to update roles for ${participant.firstName} ${participant.lastName}: ${err.response?.data || err.message}`);
-        return;
-      }
+    if (!validateRoles(assessment)) {
+      return;
     }
 
-    // Save new participants
-    for (const newParticipant of newParticipants) {
-      if (!newParticipant.userId || newParticipant.roles.length === 0) {
-        setError('Each new participant must have a user and at least one role.');
-        return;
+    try {
+      // Update existing participants
+      for (const participant of assessment.participants) {
+        const key = `${assessmentId}-${participant.userId}`;
+        const roles = changedRoles[key] || participant.roles;
+        
+        if (roles.length === 0) {
+          // Delete participant if they have no roles
+          await axiosInstance.delete(
+            `/api/v1/modules/${moduleData.id}/assessments/${assessmentId}/participants/${participant.userId}`
+          );
+        } else {
+          await axiosInstance.put(
+            `/api/v1/modules/${moduleData.id}/assessments/${assessmentId}/participants/${participant.userId}`,
+            roles
+          );
+        }
       }
 
-      try {
-        await axiosInstance.post(`/api/v1/modules/${moduleData.id}/assessments/${assessmentId}/participants`, newParticipant);
-      } catch (err) {
-        setError('Failed to add new participant: ' + err.response?.data || err.message);
-        return;
+      // Add new participants
+      const validNewParticipants = (newParticipants[assessmentId] || [])
+        .filter(p => p.userId && p.roles.length > 0);
+
+      for (const participant of validNewParticipants) {
+        await axiosInstance.post(
+          `/api/v1/modules/${moduleData.id}/assessments/${assessmentId}/participants`,
+          participant
+        );
       }
+
+      setSuccess('Changes submitted successfully');
+      setNewParticipants(prev => ({
+        ...prev,
+        [assessmentId]: []
+      }));
+
+      // Refresh assessment data
+      const assessmentsResponse = await axiosInstance.get(
+        `/api/v1/modules/${moduleData.id}/assessments/user`
+      );
+      setAssessments(assessmentsResponse.data);
+    } catch (err) {
+      setError('Failed to update participants: ' + err.message);
     }
+  };
 
-    setNewParticipants([]); // Clear new participants after submission
-    setSuccess('Changes submitted successfully.');
+  const addNewAssessment = () => {
+    setNewAssessments([...newAssessments, {
+      title: '',
+      assessmentCategory: '',
+      assessmentWeighting: '',
+      plannedIssueDate: '',
+      courseworkSubmissionDate: '',
+      participants: []
+    }]);
+  };
+
+  const handleAssessmentChange = (index, field, value) => {
+    const updatedAssessments = [...newAssessments];
+    updatedAssessments[index][field] = value;
+    setNewAssessments(updatedAssessments);
+  };
+
+  const handleSubmitNewAssessments = async () => {
+    try {
+      for (const assessment of newAssessments) {
+        await axiosInstance.post(
+          `/api/v1/modules/${moduleData.id}/assessments`,
+          assessment
+        );
+      }
+      setSuccess('New assessments added successfully');
+      setNewAssessments([]);
+      
+      // Refresh assessment data
+      const assessmentsResponse = await axiosInstance.get(
+        `/api/v1/modules/${moduleData.id}/assessments/user`
+      );
+      setAssessments(assessmentsResponse.data);
+    } catch (err) {
+      setError('Failed to add new assessments: ' + err.message);
+    }
   };
 
   if (isLoading) return <Container><Row><Col><p>Loading...</p></Col></Row></Container>;
@@ -135,10 +277,79 @@ export default function ManageModule() {
     <Container className="manage-module-container">
       <Row>
         <Col>
-          <h1>Manage Module: {moduleData.name}</h1>
+          <h1>Manage Module: {moduleData.moduleName}</h1>
           {error && <Alert variant="danger">{error}</Alert>}
           {success && <Alert variant="success">{success}</Alert>}
 
+          {/* Module Details Section */}
+          <Card className="mb-3">
+            <Card.Body>
+              <Card.Title>Module Details</Card.Title>
+              {isAssessmentLead && !editingModule && (
+                <Button onClick={() => setEditingModule(true)}>Edit Module</Button>
+              )}
+
+              {editingModule ? (
+                <Form>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Module Name</Form.Label>
+                    <Form.Control
+                      name="moduleName"
+                      value={moduleFormData.moduleName}
+                      onChange={handleModuleFormChange}
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Module Code</Form.Label>
+                    <Form.Control
+                      name="moduleCode"
+                      value={moduleFormData.moduleCode}
+                      onChange={handleModuleFormChange}
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Credits</Form.Label>
+                    <Form.Control
+                      name="credits"
+                      type="number"
+                      value={moduleFormData.credits}
+                      onChange={handleModuleFormChange}
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Level</Form.Label>
+                    <Form.Control
+                      name="level"
+                      type="number"
+                      value={moduleFormData.level}
+                      onChange={handleModuleFormChange}
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Module Outcomes</Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      name="moduleOutcomes"
+                      value={moduleFormData.moduleOutcomes}
+                      onChange={handleModuleFormChange}
+                    />
+                  </Form.Group>
+                  <Button className="me-2" onClick={handleModuleSubmit}>Save Changes</Button>
+                  <Button variant="secondary" onClick={() => setEditingModule(false)}>Cancel</Button>
+                </Form>
+              ) : (
+                <div>
+                  <p><strong>Module Name:</strong> {moduleData.moduleName}</p>
+                  <p><strong>Module Code:</strong> {moduleData.moduleCode}</p>
+                  <p><strong>Credits:</strong> {moduleData.credits}</p>
+                  <p><strong>Level:</strong> {moduleData.level}</p>
+                  <p><strong>Module Outcomes:</strong> {moduleData.moduleOutcomes}</p>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
+
+          {/* Existing Assessments Section */}
           <Card className="mb-3">
             <Card.Body>
               <Card.Title>Assessments</Card.Title>
@@ -146,6 +357,11 @@ export default function ManageModule() {
                 <Card key={assessment.id} className="mb-3">
                   <Card.Body>
                     <h4>{assessment.title}</h4>
+                    <p><strong>Category:</strong> {assessment.assessmentCategory}</p>
+                    <p><strong>Weighting:</strong> {assessment.assessmentWeighting}%</p>
+                    <p><strong>Planned Issue Date:</strong> {assessment.plannedIssueDate}</p>
+                    <p><strong>Submission Date:</strong> {assessment.courseworkSubmissionDate}</p>
+                    
                     <Card className="mb-3">
                       <Card.Body>
                         <Card.Title>Participants</Card.Title>
@@ -153,34 +369,47 @@ export default function ManageModule() {
                           <Card key={participant.userId} className="mb-3">
                             <Card.Body>
                               <p><strong>Name:</strong> {participant.firstName} {participant.lastName}</p>
-                              <p><strong>Roles:</strong></p>
-                              {Object.entries(AssessmentRoles).map(([key, value]) => (
-                                <Form.Check
-                                  key={key}
-                                  type="checkbox"
-                                  label={key}
-                                  checked={changedRoles[`${assessment.id}-${participant.userId}`]
-                                    ? changedRoles[`${assessment.id}-${participant.userId}`].includes(value)
-                                    : participant.roles.includes(value)}
-                                  onChange={() => handleRoleChange(assessment.id, participant.userId, value)}
-                                />
-                              ))}
+                              <div className="mb-3">
+                                <strong>Roles:</strong>
+                                {Object.entries(AssessmentRoles).map(([key, value]) => (
+                                  <Form.Check
+                                    key={key}
+                                    type="checkbox"
+                                    label={key}
+                                    checked={changedRoles[`${assessment.id}-${participant.userId}`]
+                                      ? changedRoles[`${assessment.id}-${participant.userId}`].includes(value)
+                                      : participant.roles.includes(value)
+                                    }
+                                    onChange={() => handleRoleChange(assessment.id, participant.userId, value)}
+                                  />
+                                ))}
+                              </div>
                             </Card.Body>
                           </Card>
                         ))}
 
-                        {/* Render new participant containers */}
-                        {newParticipants.map((participant, index) => (
-                          <Card key={index} className="mb-3">
+                        {/* New Participants Section */}
+                        {newParticipants[assessment.id]?.map((participant, index) => (
+                          <Card key={`new-${index}`} className="mb-3">
                             <Card.Body>
-                              <Form.Group>
-                                <Form.Label>Select User (by email)</Form.Label>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Select User</Form.Label>
                                 <Select
-                                  options={users.filter(user =>
-                                    !assessment.participants.some(p => p.userId === user.userId) &&
-                                    !newParticipants.some((np, i) => i !== index && np.userId === user.userId) // Filter out already added users
-                                  ).map(user => ({ value: user.userId, label: user.email }))}
-                                  onChange={(selectedOption) => handleSelectUser(index, selectedOption)}
+                                  options={users
+                                    .filter(user => 
+                                      !assessment.participants.some(p => p.userId === user.userId) &&
+                                      !newParticipants[assessment.id].some((np, i) => 
+                                        i !== index && np.userId === user.userId
+                                      )
+                                    )
+                                    .map(user => ({
+                                      value: user.userId,
+                                      label: `${user.firstName} ${user.lastName} (${user.email})`
+                                    }))}
+                                  onChange={(selectedOption) => 
+                                    handleSelectUser(assessment.id, index, selectedOption)
+                                  }
+                                  placeholder="Select a user..."
                                 />
                               </Form.Group>
                               <Form.Group>
@@ -191,7 +420,9 @@ export default function ManageModule() {
                                     type="checkbox"
                                     label={key}
                                     checked={participant.roles.includes(value)}
-                                    onChange={() => handleNewParticipantRoleChange(index, value)}
+                                    onChange={() => 
+                                      handleNewParticipantRoleChange(assessment.id, index, value)
+                                    }
                                   />
                                 ))}
                               </Form.Group>
@@ -199,20 +430,333 @@ export default function ManageModule() {
                           </Card>
                         ))}
 
-                        <Button onClick={addNewParticipantContainer}>Add Participant</Button>
+                        <Button 
+                          variant="primary" 
+                          className="mb-3"
+                          onClick={() => addNewParticipantContainer(assessment.id)}
+                        >
+                          Add New Participant
+                        </Button>
+                        
+                        <Button 
+                          variant="success"
+                          onClick={() => handleSubmitChanges(assessment.id)}
+                        >
+                          Save Participant Changes
+                        </Button>
                       </Card.Body>
                     </Card>
-                    <Button onClick={() => handleSubmitChanges(assessment.id)}>Submit Changes</Button>
                   </Card.Body>
                 </Card>
               ))}
             </Card.Body>
           </Card>
+
+          {/* New Assessments Section */}
+          {isAssessmentLead && (
+            <Card className="mb-3">
+              <Card.Body>
+                <Card.Title>Add New Assessments</Card.Title>
+                {newAssessments.map((assessment, index) => (
+                  <Card key={index} className="mb-3">
+                    <Card.Body>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Title</Form.Label>
+                        <Form.Control
+                          value={assessment.title}
+                          onChange={(e) => 
+                            handleAssessmentChange(index, 'title', e.target.value)
+                          }
+                          placeholder="Enter assessment title"
+                        />
+                      </Form.Group>
+
+                      <Form.Group className="mb-3">
+                        <Form.Label>Category</Form.Label>
+                        <Form.Control
+                          value={assessment.assessmentCategory}
+                          onChange={(e) => 
+                            handleAssessmentChange(index, 'assessmentCategory', e.target.value)
+                          }
+                          placeholder="Enter assessment category"
+                        />
+                      </Form.Group>
+
+                      <Form.Group className="mb-3">
+                        <Form.Label>Weighting (%)</Form.Label>
+                        <Form.Control
+                          type="number"
+                          value={assessment.assessmentWeighting}
+                          onChange={(e) => 
+                            handleAssessmentChange(index, 'assessmentWeighting', e.target.value)
+                          }
+                          placeholder="Enter assessment weighting"
+                        />
+                      </Form.Group>
+
+                      <Form.Group className="mb-3">
+                        <Form.Label>Planned Issue Date</Form.Label>
+                        <Form.Control
+                          type="date"
+                          value={assessment.plannedIssueDate}
+                          onChange={(e) => 
+                            handleAssessmentChange(index, 'plannedIssueDate', e.target.value)
+                          }
+                        />
+                      </Form.Group>
+
+                      <Form.Group className="mb-3">
+                        <Form.Label>Submission Date</Form.Label>
+                        <Form.Control
+                          type="date"
+                          value={assessment.courseworkSubmissionDate}
+                          onChange={(e) => 
+                            handleAssessmentChange(index, 'courseworkSubmissionDate', e.target.value)
+                          }
+                        />
+                      </Form.Group>
+                    </Card.Body>
+                  </Card>
+                ))}
+                
+                <Button 
+                  variant="primary" 
+                  className="me-2"
+                  onClick={addNewAssessment}
+                >
+                  Add New Assessment
+                </Button>
+                
+                {newAssessments.length > 0 && (
+                  <Button 
+                    variant="success"
+                    onClick={handleSubmitNewAssessments}
+                  >
+                    Submit New Assessments
+                  </Button>
+                )}
+              </Card.Body>
+            </Card>
+          )}
         </Col>
       </Row>
     </Container>
   );
 }
+
+// "use client"
+// import React, { useState, useEffect } from 'react';
+// import { useParams } from 'next/navigation';
+// import axiosInstance from '@/utils/axios';
+// import { Button, Form, Alert, Container, Row, Col, Card } from 'react-bootstrap';
+// import Select from 'react-select';
+
+// const AssessmentRoles = {
+//   EXTERNAL_EXAMINER: "EXTERNAL_EXAMINER",
+//   INTERNAL_MODERATOR: "INTERNAL_MODERATOR",
+//   PROGRAMME_DIRECTOR: "PROGRAMME_DIRECTOR",
+//   MODULE_ASSESSMENT_LEAD: "MODULE_ASSESSMENT_LEAD",
+// };
+
+// export default function ManageModule() {
+//   const params = useParams();
+//   const [moduleData, setModuleData] = useState(null);
+//   const [assessments, setAssessments] = useState([]);
+//   const [users, setUsers] = useState([]);
+//   const [newParticipants, setNewParticipants] = useState([]);
+//   const [error, setError] = useState('');
+//   const [success, setSuccess] = useState('');
+//   const [isLoading, setIsLoading] = useState(true);
+//   const [changedRoles, setChangedRoles] = useState({});
+//   const [currentAssessmentId, setCurrentAssessmentId] = useState(null);
+
+//   useEffect(() => {
+//     const fetchData = async () => {
+//       try {
+//         const moduleId = params.id;
+//         const [moduleResponse, assessmentsResponse, usersResponse] = await Promise.all([
+//           axiosInstance.get(`/api/v1/modules/${moduleId}`),
+//           axiosInstance.get(`/api/v1/modules/${moduleId}/assessments/user`),
+//           axiosInstance.get('/api/v1/users/all'),
+//         ]);
+
+//         setModuleData(moduleResponse.data);
+//         setAssessments(assessmentsResponse.data);
+//         setUsers(usersResponse.data);
+//       } catch (err) {
+//         setError('Failed to fetch data: ' + err.message);
+//       } finally {
+//         setIsLoading(false);
+//       }
+//     };
+
+//     fetchData();
+//   }, [params.id]);
+
+//   const handleRoleChange = (assessmentId, participantId, role) => {
+//     setChangedRoles(prevChangedRoles => {
+//       const key = `${assessmentId}-${participantId}`;
+//       const currentRoles = prevChangedRoles[key] ||
+//         assessments.find(a => a.id === assessmentId)
+//           .participants.find(p => p.userId === participantId)?.roles || [];
+
+//       const newRoles = new Set(currentRoles);
+//       if (newRoles.has(role)) {
+//         newRoles.delete(role);
+//       } else {
+//         newRoles.add(role);
+//       }
+
+//       return { ...prevChangedRoles, [key]: Array.from(newRoles) };
+//     });
+//   };
+
+//   const handleNewParticipantRoleChange = (index, role) => {
+//     setNewParticipants(prev => {
+//       const newRoles = new Set(prev[index].roles);
+//       if (newRoles.has(role)) {
+//         newRoles.delete(role);
+//       } else {
+//         newRoles.add(role);
+//       }
+//       const updatedParticipants = [...prev];
+//       updatedParticipants[index] = { ...updatedParticipants[index], roles: Array.from(newRoles) };
+//       return updatedParticipants;
+//     });
+//   };
+
+//   const addNewParticipantContainer = () => {
+//     setNewParticipants(prev => [...prev, { userId: null, roles: [] }]);
+//   };
+
+//   const handleSelectUser = (index, selectedOption) => {
+//     setNewParticipants(prev => {
+//       const updatedParticipants = [...prev];
+//       updatedParticipants[index] = { ...updatedParticipants[index], userId: selectedOption.value };
+//       return updatedParticipants;
+//     });
+//   };
+
+//   const handleSubmitChanges = async (assessmentId) => {
+//     const assessment = assessments.find(a => a.id === assessmentId);
+
+//     // Save changes for existing participants
+//     for (const participant of assessment.participants) {
+//       const key = `${assessmentId}-${participant.userId}`;
+//       const roles = changedRoles[key] || participant.roles;
+
+//       try {
+//         await axiosInstance.put(`/api/v1/modules/${moduleData.id}/assessments/${assessmentId}/participants/${participant.userId}`, roles);
+//       } catch (err) {
+//         setError(`Failed to update roles for ${participant.firstName} ${participant.lastName}: ${err.response?.data || err.message}`);
+//         return;
+//       }
+//     }
+
+//     // Save new participants
+//     for (const newParticipant of newParticipants) {
+//       if (!newParticipant.userId || newParticipant.roles.length === 0) {
+//         setError('Each new participant must have a user and at least one role.');
+//         return;
+//       }
+
+//       try {
+//         await axiosInstance.post(`/api/v1/modules/${moduleData.id}/assessments/${assessmentId}/participants`, newParticipant);
+//       } catch (err) {
+//         setError('Failed to add new participant: ' + err.response?.data || err.message);
+//         return;
+//       }
+//     }
+
+//     setNewParticipants([]); // Clear new participants after submission
+//     setSuccess('Changes submitted successfully.');
+//   };
+
+//   if (isLoading) return <Container><Row><Col><p>Loading...</p></Col></Row></Container>;
+//   if (!moduleData) return <Container><Row><Col><Alert variant="danger">{error || 'Failed to load module data.'}</Alert></Col></Row></Container>;
+
+//   return (
+//     <Container className="manage-module-container">
+//       <Row>
+//         <Col>
+//           <h1>Manage Module: {moduleData.name}</h1>
+//           {error && <Alert variant="danger">{error}</Alert>}
+//           {success && <Alert variant="success">{success}</Alert>}
+
+//           <Card className="mb-3">
+//             <Card.Body>
+//               <Card.Title>Assessments</Card.Title>
+//               {assessments.map((assessment) => (
+//                 <Card key={assessment.id} className="mb-3">
+//                   <Card.Body>
+//                     <h4>{assessment.title}</h4>
+//                     <Card className="mb-3">
+//                       <Card.Body>
+//                         <Card.Title>Participants</Card.Title>
+//                         {assessment.participants.map((participant) => (
+//                           <Card key={participant.userId} className="mb-3">
+//                             <Card.Body>
+//                               <p><strong>Name:</strong> {participant.firstName} {participant.lastName}</p>
+//                               <p><strong>Roles:</strong></p>
+//                               {Object.entries(AssessmentRoles).map(([key, value]) => (
+//                                 <Form.Check
+//                                   key={key}
+//                                   type="checkbox"
+//                                   label={key}
+//                                   checked={changedRoles[`${assessment.id}-${participant.userId}`]
+//                                     ? changedRoles[`${assessment.id}-${participant.userId}`].includes(value)
+//                                     : participant.roles.includes(value)}
+//                                   onChange={() => handleRoleChange(assessment.id, participant.userId, value)}
+//                                 />
+//                               ))}
+//                             </Card.Body>
+//                           </Card>
+//                         ))}
+
+//                         {/* Render new participant containers */}
+//                         {newParticipants.map((participant, index) => (
+//                           <Card key={index} className="mb-3">
+//                             <Card.Body>
+//                               <Form.Group>
+//                                 <Form.Label>Select User (by email)</Form.Label>
+//                                 <Select
+//                                   options={users.filter(user =>
+//                                     !assessment.participants.some(p => p.userId === user.userId) &&
+//                                     !newParticipants.some((np, i) => i !== index && np.userId === user.userId) // Filter out already added users
+//                                   ).map(user => ({ value: user.userId, label: user.email }))}
+//                                   onChange={(selectedOption) => handleSelectUser(index, selectedOption)}
+//                                 />
+//                               </Form.Group>
+//                               <Form.Group>
+//                                 <Form.Label>Select Roles</Form.Label>
+//                                 {Object.entries(AssessmentRoles).map(([key, value]) => (
+//                                   <Form.Check
+//                                     key={key}
+//                                     type="checkbox"
+//                                     label={key}
+//                                     checked={participant.roles.includes(value)}
+//                                     onChange={() => handleNewParticipantRoleChange(index, value)}
+//                                   />
+//                                 ))}
+//                               </Form.Group>
+//                             </Card.Body>
+//                           </Card>
+//                         ))}
+
+//                         <Button onClick={addNewParticipantContainer}>Add Participant</Button>
+//                       </Card.Body>
+//                     </Card>
+//                     <Button onClick={() => handleSubmitChanges(assessment.id)}>Submit Changes</Button>
+//                   </Card.Body>
+//                 </Card>
+//               ))}
+//             </Card.Body>
+//           </Card>
+//         </Col>
+//       </Row>
+//     </Container>
+//   );
+// }
 
 
 

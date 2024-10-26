@@ -55,6 +55,34 @@ export const notifyExternalExaminer = async (examinerEmail, assessmentDetails) =
  * @param {object} assessmentDetails - Details of the assessment
  * @returns {Promise}
  */
+export const notifyAssessmentLead = async (moderatorEmail, assessmentDetails) => {
+  const subject = 'Assessment Lead Attention required for Assessment';
+  const body = `
+    Dear Assessment Lead,
+
+    An assessment requires your moderation:
+
+    Assessment Title: ${assessmentDetails.title}
+    Module: ${assessmentDetails.module}
+    Module Code:${assessmentDetails.moduleCode}
+    Due Date: ${assessmentDetails.dueDate}
+
+    Please log in to the system to complete the moderation process.
+
+    Best regards,
+    Assessment Team
+  `;
+
+  return sendEmail(moderatorEmail, subject, body);
+};
+
+
+/**
+ * Sends a notification email to an internal moderator.
+ * @param {string} moderatorEmail - Internal moderator's email address
+ * @param {object} assessmentDetails - Details of the assessment
+ * @returns {Promise}
+ */
 export const notifyInternalModerator = async (moderatorEmail, assessmentDetails) => {
   const subject = 'Internal Moderation Request';
   const body = `

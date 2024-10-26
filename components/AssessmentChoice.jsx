@@ -62,6 +62,7 @@ export default function AssessmentChoicePage({ moduleId }) {
           <p>Category: {assessment.assessmentCategory}</p>
           <p>Weighting: {assessment.assessmentWeighting}%</p>
           <p>Your Role: {formattedRoles}</p>
+          {/* <p>Assessment Status:{}</p> */}
         </div>
       );
     })}
